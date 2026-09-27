@@ -1,0 +1,394 @@
+:root {
+  font-family: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  line-height: 1.45;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+
+  --text-color: #e8eaed;
+  --text-muted: #9aa0a6;
+  --border-color: #3c4043;
+  --app-bg: #1e1f22;
+  --app-header-bg: #25262a;
+  --panel-bg: #1a1b1e;
+  --panel-header-bg: #222327;
+  --input-bg: #2b2d31;
+  --accent: #8ab4f8;
+  --error: #f28b82;
+  --result: #81c995;
+  --science: #fdd663;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 120%;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100%;
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--text-color);
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: var(--text-color);
+}
+
+button,
+.file-button {
+  border: 1px solid var(--border-color);
+  background: var(--panel-bg);
+  color: var(--text-color);
+  border-radius: 4px;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+.file-button:hover {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+a {
+  color: var(--accent);
+}
+
+.app {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 0 3rem;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  column-gap: 1.25rem;
+  row-gap: 0.55rem;
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--app-header-bg);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: none;
+}
+
+.brand-icon {
+  display: block;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+}
+
+.mark {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-color);
+}
+
+h1 {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  flex: 1 0 auto;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: end;
+  justify-content: flex-end;
+}
+
+.controls label,
+.modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+select,
+.controls input,
+.modal input {
+  min-width: 10rem;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-color);
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+select:focus,
+.controls input:focus,
+.modal input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.file-button input,
+.drop input {
+  display: none;
+}
+
+main {
+  padding: 0 0.85rem;
+}
+
+.start {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.drop {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1.1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  cursor: pointer;
+}
+
+.drop:hover {
+  border-color: var(--accent);
+}
+
+.drop span {
+  font-size: 0.95rem;
+  color: var(--text-color);
+}
+
+.drop small,
+.note {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--text-color);
+  font-size: 0.82rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.note,
+.error,
+.banner,
+.summary {
+  margin: 0;
+}
+
+.run {
+  justify-self: start;
+  background: var(--accent);
+  color: #0f1012;
+  border-color: var(--accent);
+}
+
+.run-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.disclaimer {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--error);
+}
+
+.run:hover:not(:disabled) {
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+
+.error,
+.banner-error {
+  color: var(--error);
+}
+
+.summary,
+.banner,
+.warnings {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.8rem;
+  color: var(--text-color);
+}
+
+.summary > summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.summary p,
+.banner p {
+  margin: 0.4rem 0 0;
+}
+
+.review-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+
+.toolbar-actions,
+.modal-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.sources {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.manuscript {
+  background: #121316;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.75rem 0.9rem;
+  color: var(--text-color);
+}
+
+.manuscript p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.para-heading {
+  font-weight: 650;
+}
+
+.del {
+  color: var(--error);
+  text-decoration: line-through;
+}
+
+.ins {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.md-comment {
+  color: var(--accent);
+}
+
+.md-comment-science {
+  color: var(--science);
+}
+
+.md-comment.is-rejected {
+  opacity: 0.45;
+}
+
+.md-comment.is-accepted {
+  color: var(--result);
+}
+
+.md-comment button {
+  margin-left: 0.2rem;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  vertical-align: baseline;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 55%);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.modal {
+  width: min(32rem, 100%);
+  background: var(--app-header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem 1.1rem 1.1rem;
+  color: var(--text-color);
+}
+
+.modal h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.modal input { width: 100%; }
+
+@media (max-width: 800px) {
+  .top { display: block; }
+  .controls { justify-content: flex-start; margin-top: 0.75rem; }
+}
