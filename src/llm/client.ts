@@ -2,6 +2,11 @@ import { GoogleGenAI, type GroundingMetadata } from '@google/genai'
 import type { LlmProvider } from './storage.ts'
 import type { GroundingSource } from '../review/types.ts'
 
+export type ChatTurn = {
+  role: 'user' | 'model'
+  text: string
+}
+
 export type ReviewReply = {
   text: string
   grounded: boolean
@@ -14,6 +19,7 @@ export async function generateReview(options: {
   baseUrl?: string
   model: string
   systemInstruction: string
+  history?: ChatTurn[]
   prompt: string
   search: boolean
 }): Promise<ReviewReply> {
@@ -21,7 +27,13 @@ export async function generateReview(options: {
   const ai = new GoogleGenAI({ apiKey: options.apiKey })
   const response = await ai.models.generateContent({
     model: options.model,
-    contents: options.prompt,
+    contents: [
+      ...(options.history ?? []).map((turn) => ({
+        role: turn.role,
+        parts: [{ text: turn.text }],
+      })),
+      { role: 'user', parts: [{ text: options.prompt }] },
+    ],
     config: {
       systemInstruction: options.systemInstruction,
       maxOutputTokens: 32768,
@@ -50,6 +62,7 @@ async function generateOpenAi(options: {
   baseUrl?: string
   model: string
   systemInstruction: string
+  history?: ChatTurn[]
   prompt: string
 }): Promise<ReviewReply> {
   const response = await fetch(`${trimBase(options.baseUrl ?? '')}/chat/completions`, {
@@ -62,6 +75,10 @@ async function generateOpenAi(options: {
       model: options.model,
       messages: [
         { role: 'system', content: options.systemInstruction },
+        ...(options.history ?? []).map((turn) => ({
+          role: turn.role === 'model' ? 'assistant' : 'user',
+          content: turn.text,
+        })),
         { role: 'user', content: options.prompt },
       ],
       max_tokens: 16384,

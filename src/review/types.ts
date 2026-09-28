@@ -46,6 +46,11 @@ export type LoadedDocument = {
   tex?: string
 }
 
+export type ChatLog = {
+  system: string
+  turns: { role: 'user' | 'model'; text: string }[]
+}
+
 export type ReviewSession = {
   document: LoadedDocument
   suggestions: Suggestion[]
@@ -55,6 +60,7 @@ export type ReviewSession = {
   scienceRan: boolean
   scienceError: string | null
   disciplineTitle: string
+  chatLog: ChatLog
 }
 
 export function editedStem(fileName: string): string {

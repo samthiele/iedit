@@ -1,12 +1,12 @@
-import { generateReview, readableGeminiError } from './client.ts'
+import { generateReview, readableGeminiError, type ChatTurn } from './client.ts'
 import type { LlmProvider } from './storage.ts'
-import { bindEdits, extractEditFence, parseEditBody } from '../review/edits.ts'
+import { interpretModelReply } from '../review/edits.ts'
 import { isEditable, type GroundingSource, type LoadedDocument, type Paragraph, type ReviewSession, type Suggestion } from '../review/types.ts'
 
 export const BLOCK_PRESETS = [
-  { id: 'short', chars: 9000, label: 'Short' },
+  { id: 'low', chars: 80000, label: 'Low' },
   { id: 'medium', chars: 36000, label: 'Medium' },
-  { id: 'long', chars: 80000, label: 'Long' },
+  { id: 'high', chars: 9000, label: 'High' },
 ] as const
 
 export type BlockSize = (typeof BLOCK_PRESETS)[number]['id']
@@ -23,11 +23,11 @@ export function plannedBlocks(paragraphs: Paragraph[], chars: number, includeSci
   }
 }
 
-const COPYEDIT_TASK = `Copyedit this whole slice. Work through every paragraph marked role: edit, from the first to the last. Rewrite unclear sentences one sentence or clause at a time. Keep connectors such as Thus, However, and Because. A slice this size needs many wording changes, not a short sample of the worst ones. Every wording change needs ~~old~~ copied verbatim, a replacement, and [COMMENT-COPYEDIT: why]. Do not edit CONTEXT paragraphs. Return a short summary, then one iedit-edits fence.`
+const COPYEDIT_TASK = `Copyedit this whole slice. Work through every paragraph marked role: edit, from the first to the last. Rewrite unclear sentences one sentence or clause at a time. Keep connectors such as Thus, However, and Because. A slice this size needs many wording changes, not a short sample of the worst ones. Every wording change needs ~~old~~ copied verbatim, a replacement, and [COMMENT-COPYEDIT: why]. Do not edit CONTEXT paragraphs. If earlier turns already suggested edits, do not repeat them. Return a short summary, then one iedit-edits fence.`
 
-const SCIENCE_TASK = `Science pass only. Do not propose wording replacements. Work through every paragraph marked role: edit. Use Google Search before any note that depends on a citation, a formal name, or whether a method can support a claim. If search does not settle it, say "could not verify". Internal mismatches can be noted as internal. Return a note for each checkable claim in this slice, not only the first few. Return [COMMENT-SCIENCE: ...] notes in one iedit-edits fence, plus a short summary. Do not edit CONTEXT paragraphs.`
+const SCIENCE_TASK = `Science pass only. Do not propose wording replacements. Work through every paragraph marked role: edit. Use Google Search before any note that depends on a citation, a formal name, or whether a method can support a claim. If search does not settle it, say "could not verify". Internal mismatches can be noted as internal. Return a note for each checkable claim in this slice, not only the first few. If earlier turns already made suggestions, do not repeat them. Return [COMMENT-SCIENCE: ...] notes in one iedit-edits fence, plus a short summary. Do not edit CONTEXT paragraphs.`
 
-const SCIENCE_TASK_UNCHECKED = `Science pass only. Do not propose wording replacements. You cannot search the web. Work through every paragraph marked role: edit. For a citation, a formal name, or a method that the manuscript itself does not settle, say "could not verify". Internal mismatches can be noted as internal. Return [COMMENT-SCIENCE: ...] notes in one iedit-edits fence, plus a short summary. Do not edit CONTEXT paragraphs.`
+const SCIENCE_TASK_UNCHECKED = `Science pass only. Do not propose wording replacements. You cannot search the web. Work through every paragraph marked role: edit. For a citation, a formal name, or a method that the manuscript itself does not settle, say "could not verify". Internal mismatches can be noted as internal. If earlier turns already made suggestions, do not repeat them. Return [COMMENT-SCIENCE: ...] notes in one iedit-edits fence, plus a short summary. Do not edit CONTEXT paragraphs.`
 
 export async function runReview(options: {
   provider: LlmProvider
@@ -38,6 +38,7 @@ export async function runReview(options: {
   document: LoadedDocument
   includeScience: boolean
   chunkChars: number
+  customPrompt?: string
   disciplineTitle: string
   onProgress: (message: string) => void
 }): Promise<ReviewSession> {
@@ -50,16 +51,21 @@ export async function runReview(options: {
   const warnings: string[] = []
   const summaries: string[] = []
   const sources: GroundingSource[] = []
+  const history: ChatTurn[] = []
+  const systemInstruction = appendCustomPrompt(options.systemInstruction, options.customPrompt ?? '')
 
   const copyChunks = chunkParagraphs(editable, options.chunkChars)
   for (let index = 0; index < copyChunks.length; index += 1) {
     options.onProgress(`Copyedit ${index + 1} of ${copyChunks.length}`)
     const chunkResult = await reviewChunk({
       ...options,
+      systemInstruction,
+      history,
       paragraphs: copyChunks[index],
       mode: 'copyedit',
       idPrefix: `c${index + 1}`,
     })
+    history.push(...chunkResult.turns)
     summaries.push(chunkResult.summary)
     suggestions.push(...chunkResult.suggestions)
     warnings.push(...chunkResult.warnings)
@@ -73,10 +79,13 @@ export async function runReview(options: {
       try {
         const chunkResult = await reviewChunk({
           ...options,
+          systemInstruction,
+          history,
           paragraphs: scienceChunks[index],
           mode: 'science',
           idPrefix: `s${index + 1}`,
         })
+        history.push(...chunkResult.turns)
         summaries.push(chunkResult.summary)
         suggestions.push(...chunkResult.suggestions)
         warnings.push(...chunkResult.warnings)
@@ -104,6 +113,7 @@ export async function runReview(options: {
     scienceRan: options.includeScience,
     scienceError,
     disciplineTitle: options.disciplineTitle,
+    chatLog: { system: systemInstruction, turns: history },
   }
 }
 
@@ -114,10 +124,11 @@ async function reviewChunk(options: {
   model: string
   systemInstruction: string
   document: LoadedDocument
+  history: ChatTurn[]
   paragraphs: Paragraph[]
   mode: 'copyedit' | 'science'
   idPrefix: string
-}): Promise<{ suggestions: Suggestion[]; warnings: string[]; summary: string; sources: GroundingSource[]; grounded: boolean }> {
+}): Promise<{ suggestions: Suggestion[]; warnings: string[]; summary: string; sources: GroundingSource[]; grounded: boolean; turns: ChatTurn[] }> {
   const search = options.mode === 'science' && options.provider === 'gemini'
   const prompt = formatChunk(options.paragraphs, options.document.paragraphs, options.mode, search)
   const reply = await generateReview({
@@ -126,24 +137,34 @@ async function reviewChunk(options: {
     baseUrl: options.baseUrl,
     model: options.model,
     systemInstruction: options.systemInstruction,
+    history: options.history,
     prompt,
     search,
   })
-  let parsed = parseReply(reply.text, options.paragraphs, options.idPrefix, reply.grounded)
+  const turns: ChatTurn[] = [
+    { role: 'user', text: prompt },
+    { role: 'model', text: reply.text },
+  ]
+  let parsed = interpretModelReply(reply.text, options.paragraphs, { idPrefix: options.idPrefix, grounded: reply.grounded })
   if (parsed.unmatched.length > 0) {
     const missedIds = new Set(parsed.unmatched.map((message) => message.split(':')[0]?.trim()).filter(Boolean))
     const missed = options.paragraphs.filter((paragraph) => missedIds.has(paragraph.id))
-    const retryPrompt = formatChunk(missed.length > 0 ? missed : options.paragraphs, options.document.paragraphs, options.mode, search)
+    const retryPrompt = `${formatChunk(missed.length > 0 ? missed : options.paragraphs, options.document.paragraphs, options.mode, search)}\n\nThe previous finds were not verbatim. Return only an iedit-edits fence. Copy ~~old~~ exactly from the paragraph.\n\n${parsed.unmatched.join('\n')}`
     const retry = await generateReview({
       provider: options.provider,
       apiKey: options.apiKey,
       baseUrl: options.baseUrl,
       model: options.model,
       systemInstruction: options.systemInstruction,
-      prompt: `${retryPrompt}\n\nThe previous finds were not verbatim. Return only an iedit-edits fence. Copy ~~old~~ exactly from the paragraph.\n\n${parsed.unmatched.join('\n')}`,
+      history: [...options.history, ...turns],
+      prompt: retryPrompt,
       search,
     })
-    const second = parseReply(retry.text, options.paragraphs, `${options.idPrefix}r`, reply.grounded || retry.grounded)
+    turns.push({ role: 'user', text: retryPrompt }, { role: 'model', text: retry.text })
+    const second = interpretModelReply(retry.text, options.paragraphs, {
+      idPrefix: `${options.idPrefix}r`,
+      grounded: reply.grounded || retry.grounded,
+    })
     const recovered = new Set(second.suggestions.map((item) => item.paraId))
     const remaining = parsed.unmatched.filter((message) => !recovered.has(message.split(':')[0] ?? ''))
     parsed = {
@@ -158,19 +179,14 @@ async function reviewChunk(options: {
     summary: parsed.summary,
     sources: reply.sources,
     grounded: reply.grounded,
+    turns,
   }
 }
 
-function parseReply(text: string, paragraphs: Paragraph[], idPrefix: string, grounded: boolean) {
-  const extracted = extractEditFence(text)
-  const edits = parseEditBody(extracted.body)
-  const bound = bindEdits(edits, paragraphs, { idPrefix, grounded })
-  const unmatched = !extracted.body.trim()
-    ? ['The response did not include an iedit-edits fence.']
-    : edits.length === 0
-      ? ['The iedit-edits fence did not contain any paragraph blocks.']
-      : bound.unmatched
-  return { suggestions: bound.suggestions, unmatched, summary: extracted.summary }
+function appendCustomPrompt(instruction: string, customPrompt: string): string {
+  const extra = customPrompt.trim()
+  if (!extra) return instruction
+  return `${instruction}\n\n---\n\n# Author instructions\n\nFollow these extra instructions for this manuscript:\n\n${extra}`
 }
 
 function formatChunk(chunk: Paragraph[], all: Paragraph[], mode: 'copyedit' | 'science', search: boolean): string {

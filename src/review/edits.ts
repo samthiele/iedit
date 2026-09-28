@@ -155,6 +155,22 @@ export function bindEdits(
   return { suggestions, unmatched }
 }
 
+export function interpretModelReply(
+  text: string,
+  paragraphs: Paragraph[],
+  options: { idPrefix: string; grounded: boolean },
+): { suggestions: Suggestion[]; unmatched: string[]; summary: string } {
+  const extracted = extractEditFence(text)
+  const edits = parseEditBody(extracted.body)
+  const bound = bindEdits(edits, paragraphs, options)
+  const unmatched = !extracted.body.trim()
+    ? ['The response did not include an iedit-edits fence.']
+    : edits.length === 0
+      ? ['The iedit-edits fence did not contain any paragraph blocks.']
+      : bound.unmatched
+  return { suggestions: bound.suggestions, unmatched, summary: extracted.summary }
+}
+
 function trimQuote(value: string): string {
   const compact = value.replace(/\s+/g, ' ').trim()
   return compact.length > 80 ? `${compact.slice(0, 77)}...` : compact

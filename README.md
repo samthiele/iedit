@@ -2,7 +2,7 @@
 
 Static manuscript review. Upload a Word or LaTeX file, bring a Gemini key or an OpenAI-compatible key, and review sentence-level suggestions before downloading a redlined `.docx` or `.tex` file.
 
-The manuscript is read in the browser. The API key stays in local storage and is sent only to the provider you choose. For the HZDR LiteLLM proxy, set the server to `https://api-genai.hzdr.de/v1`.
+The manuscript is read in the browser. The API key stays in local storage and is sent only to the provider you choose.
 
 ```bash
 npm install

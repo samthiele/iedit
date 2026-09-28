@@ -1,17 +1,120 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <title>iEdit</title>
-  <g transform="rotate(-40 32 32)">
-    <path fill="#2b2d31" d="M8.4 32 16.4 24.2v15.6z"/>
-    <path fill="#f3d3ad" d="M16.4 24.2 25.2 20.8v22.4l-8.8-3.4z"/>
-    <path fill="#e4bc90" d="M17.1 32H25.2v9.7l-8.1-3.1z"/>
-    <path fill="#f0c14b" d="M25.2 20.8h20.4v22.4H25.2z"/>
-    <path fill="#ffe39a" d="M26.2 22.5h18.4v5.2H26.2z"/>
-    <path fill="#dba01e" d="M26.2 37.1h18.4v4.7H26.2z"/>
-    <path fill="#e8eaed" d="M45.2 20.8h6.1v22.4h-6.1z"/>
-    <path fill="#9aa0a6" d="M46.55 21.7h1.35v20.6h-1.35zm2.5 0h1.35v20.6h-1.35z"/>
-    <path fill="#f28b82" d="M51.3 22.6h3.9c3.4 0 4.6 2.6 4.6 5.6v7.6c0 3-1.2 5.6-4.6 5.6h-3.9V22.6z"/>
-    <path fill="#f7b4ae" d="M52.1 24.1h2.8c1.5.7 2.2 1.9 2.2 3.1v1.2h-5V24.1z"/>
-    <path stroke="#1e1f22" stroke-width="1.35" stroke-linejoin="round" d="M8.4 32 16.4 24.2 25.2 20.8h26.1v1.8h3.9c3.4 0 4.6 2.6 4.6 5.6v7.6c0 3-1.2 5.6-4.6 5.6h-3.9v1.8H25.2l-8.8-3.4z"/>
-    <path stroke="#1e1f22" stroke-width="1.05" d="M25.2 20.8v22.4M45.6 20.8v22.4"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 64 64"
+   fill="none"
+   version="1.1"
+   id="svg12"
+   sodipodi:docname="favicon.svg"
+   inkscape:version="1.4 (e7c3feb1, 2024-10-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs12">
+    <marker
+       markerWidth="1.04999995"
+       markerHeight="0.99999995"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       id="CapRibbon1"
+       viewBox="0 0 1.05 1"
+       inkscape:stockid="Ribbon cap"
+       style="overflow:visible"
+       preserveAspectRatio="xMidYMid"
+       inkscape:isstock="true"
+       inkscape:collect="always">
+      <path
+         style="fill:context-stroke;stroke-linecap:butt"
+         d="M 0,-1 H 2 L 1,0 2,1 H 0 L -0.1,0 Z"
+         sodipodi:nodetypes="sssssscsss"
+         transform="scale(0.5)"
+         id="path62" />
+    </marker>
+  </defs>
+  <sodipodi:namedview
+     id="namedview12"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="3.718595"
+     inkscape:cx="29.043227"
+     inkscape:cy="54.052673"
+     inkscape:window-width="1512"
+     inkscape:window-height="921"
+     inkscape:window-x="1920"
+     inkscape:window-y="78"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g12" />
+  <title
+     id="title1">iEdit</title>
+  <g
+     transform="rotate(-40 32 32)"
+     id="g12">
+    <path
+       style="fill:none;stroke:#c13222;stroke-width:1.656;paint-order:stroke fill markers;stroke-dasharray:none;stroke-dashoffset:0;marker-end:url(#CapRibbon1);stroke-opacity:1"
+       d="M -3.0682138,36.978771 31.746416,66.191714"
+       id="path13" />
+    <g
+       id="g1"
+       transform="matrix(1.2186783,-0.2677415,0.2677415,1.2186783,-21.726519,1.0833627)">
+      <path
+         fill="#2b2d31"
+         d="m 8.4,32 8,-7.8 v 15.6 z"
+         id="path1"
+         style="fill:#9aa0a6;fill-opacity:1" />
+      <path
+         fill="#f3d3ad"
+         d="m 16.4,24.2 8.8,-3.4 v 22.4 l -8.8,-3.4 z"
+         id="path2" />
+      <path
+         fill="#e4bc90"
+         d="m 17.1,32 h 8.1 v 9.7 l -8.1,-3.1 z"
+         id="path3" />
+      <path
+         fill="#f0c14b"
+         d="M 25.2,20.8 H 45.6 V 43.2 H 25.2 Z"
+         id="path4" />
+      <path
+         fill="#ffe39a"
+         d="m 26.2,22.5 h 18.4 v 5.2 H 26.2 Z"
+         id="path5" />
+      <path
+         fill="#dba01e"
+         d="m 26.2,37.1 h 18.4 v 4.7 H 26.2 Z"
+         id="path6" />
+      <path
+         fill="#e8eaed"
+         d="m 45.2,20.8 h 6.1 v 22.4 h -6.1 z"
+         id="path7" />
+      <path
+         fill="#9aa0a6"
+         d="m 46.55,21.7 h 1.35 v 20.6 h -1.35 z m 2.5,0 h 1.35 v 20.6 h -1.35 z"
+         id="path8" />
+      <path
+         fill="#f28b82"
+         d="m 51.3,22.6 h 3.9 c 3.4,0 4.6,2.6 4.6,5.6 v 7.6 c 0,3 -1.2,5.6 -4.6,5.6 h -3.9 z"
+         id="path9" />
+      <path
+         fill="#f7b4ae"
+         d="m 52.1,24.1 h 2.8 c 1.5,0.7 2.2,1.9 2.2,3.1 v 1.2 h -5 z"
+         id="path10" />
+      <path
+         stroke="#1e1f22"
+         stroke-width="1.35"
+         stroke-linejoin="round"
+         d="m 8.4,32 8,-7.8 8.8,-3.4 h 26.1 v 1.8 h 3.9 c 3.4,0 4.6,2.6 4.6,5.6 v 7.6 c 0,3 -1.2,5.6 -4.6,5.6 h -3.9 v 1.8 H 25.2 l -8.8,-3.4 z"
+         id="path11" />
+      <path
+         stroke="#1e1f22"
+         stroke-width="1.05"
+         d="M 25.2,20.8 V 43.2 M 45.6,20.8 v 22.4"
+         id="path12" />
+    </g>
   </g>
 </svg>

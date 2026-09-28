@@ -5,12 +5,13 @@ const OPENAI_KEY = 'iedit.openaiApiKey'
 const OPENAI_BASE = 'iedit.openaiBaseUrl'
 const OPENAI_MODEL = 'iedit.openaiModel'
 const BLOCK = 'iedit.blockSize'
+const PROMPT = 'iedit.customPrompt'
 const DISCIPLINE = 'iedit.discipline'
 const CUSTOM = 'iedit.customSkills'
 
 export type LlmProvider = 'gemini' | 'openai'
 
-export const DEFAULT_OPENAI_BASE_URL = 'https://api-genai.hzdr.de/v1'
+export const DEFAULT_OPENAI_BASE_URL = ''
 
 export type StoredSkill = {
   id: string
@@ -76,11 +77,21 @@ export function setStoredModel(modelId: string): void {
 
 export function getBlockSize(): string {
   const stored = localStorage.getItem(BLOCK)
-  return stored === 'short' || stored === 'long' ? stored : 'medium'
+  if (stored === 'high' || stored === 'short') return 'high'
+  if (stored === 'low' || stored === 'long') return 'low'
+  return 'medium'
 }
 
 export function setBlockSize(size: string): void {
   localStorage.setItem(BLOCK, size)
+}
+
+export function getCustomPrompt(): string {
+  return localStorage.getItem(PROMPT) ?? ''
+}
+
+export function setCustomPrompt(prompt: string): void {
+  localStorage.setItem(PROMPT, prompt)
 }
 
 export function getStoredDiscipline(): string {
