@@ -1,6 +1,7 @@
 import { generateReview, readableGeminiError, type ChatTurn } from './client.ts'
 import type { LlmProvider } from './storage.ts'
 import { interpretModelReply } from '../review/edits.ts'
+import { projectParagraph } from '../review/richText.ts'
 import { isEditable, type GroundingSource, type LoadedDocument, type Paragraph, type ReviewSession, type Suggestion } from '../review/types.ts'
 
 export const BLOCK_PRESETS = [
@@ -23,7 +24,7 @@ export function plannedBlocks(paragraphs: Paragraph[], chars: number, includeSci
   }
 }
 
-const COPYEDIT_TASK = `Copyedit this whole slice. Work through every paragraph marked role: edit, from the first to the last. Rewrite unclear sentences one sentence or clause at a time. Keep connectors such as Thus, However, and Because. A slice this size needs many wording changes, not a short sample of the worst ones. Every wording change needs ~~old~~ copied verbatim, a replacement, and [COMMENT-COPYEDIT: why]. Do not edit CONTEXT paragraphs. If earlier turns already suggested edits, do not repeat them. Return a short summary, then one iedit-edits fence.`
+const COPYEDIT_TASK = `Copyedit this whole slice. Work through every paragraph marked role: edit, from the first to the last. Rewrite unclear sentences one sentence or clause at a time. Keep connectors such as Thus, However, and Because. A slice this size needs many wording changes, not a short sample of the worst ones. Paragraph text uses markdown for headings, emphasis, and links. Every wording change needs ~~old~~ copied from that text, a replacement, and [COMMENT-COPYEDIT: why]. Do not edit CONTEXT paragraphs. If earlier turns already suggested edits, do not repeat them. Return a short summary, then one iedit-edits fence.`
 
 const SCIENCE_TASK = `Science pass only. Do not propose wording replacements. Work through every paragraph marked role: edit. Use Google Search before any note that depends on a citation, a formal name, or whether a method can support a claim. If search does not settle it, say "could not verify". Internal mismatches can be noted as internal. Return a note for each checkable claim in this slice, not only the first few. If earlier turns already made suggestions, do not repeat them. Return [COMMENT-SCIENCE: ...] notes in one iedit-edits fence, plus a short summary. Do not edit CONTEXT paragraphs.`
 
@@ -211,7 +212,7 @@ function formatParagraph(paragraph: Paragraph, context: boolean): string {
     `section: ${paragraph.section}`,
     context ? 'role: CONTEXT — do not edit' : 'role: edit',
     '',
-    paragraph.text,
+    projectParagraph(paragraph).markdown,
   ].join('\n')
 }
 

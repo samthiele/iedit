@@ -48,6 +48,9 @@ export default function TestPage() {
           />
         ) : null}
       </main>
+      <footer className="site-footer">
+        <a href="https://www.samthiele.science/" target="_blank" rel="noreferrer">Sam Thiele 2026</a>
+      </footer>
     </div>
   )
 }

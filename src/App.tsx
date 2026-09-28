@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ReviewPane } from './components/ReviewPane.tsx'
+import { SkillDialog } from './components/SkillDialog.tsx'
 import { SetupDialog } from './components/SetupDialog.tsx'
 import { loadModelCatalog, resolveModel, type ModelCatalog } from './llm/models.ts'
 import { readableGeminiError } from './llm/client.ts'
@@ -27,6 +28,7 @@ export default function App() {
   const [disciplineId, setDisciplineId] = useState(getStoredDiscipline)
   const [customSkills, setCustomSkills] = useState(getCustomSkills)
   const [setupOpen, setSetupOpen] = useState(false)
+  const [skillOpen, setSkillOpen] = useState(false)
   const [documentFile, setDocumentFile] = useState<LoadedDocument | null>(null)
   const [includeScience, setIncludeScience] = useState(true)
   const [blockSize, setBlockSizeState] = useState(getBlockSize)
@@ -107,20 +109,24 @@ export default function App() {
     }
   }
 
+  function addSkill(skill: { title: string; body: string }) {
+    const stored: StoredSkill = {
+      id: `custom-${crypto.randomUUID()}`,
+      title: skill.title,
+      body: skill.body,
+    }
+    const next = [...customSkills, stored]
+    setCustomSkills(next)
+    saveCustomSkills(next)
+    setDisciplineId(stored.id)
+    setStoredDiscipline(stored.id)
+  }
+
   function onUploadSkill(file: File | undefined) {
     if (!file) return
     void file.text().then((raw) => {
       const parsed = parseSkill(raw, file.name.replace(/\.md$/i, ''))
-      const skill: StoredSkill = {
-        id: `custom-${crypto.randomUUID()}`,
-        title: parsed.title,
-        body: parsed.body,
-      }
-      const next = [...customSkills, skill]
-      setCustomSkills(next)
-      saveCustomSkills(next)
-      setDisciplineId(skill.id)
-      setStoredDiscipline(skill.id)
+      addSkill(parsed)
     })
   }
 
@@ -157,6 +163,10 @@ export default function App() {
             aria-label="Discipline"
             value={discipline.id}
             onChange={(event) => {
+              if (event.target.value === 'custom') {
+                setSkillOpen(true)
+                return
+              }
               setDisciplineId(event.target.value)
               setStoredDiscipline(event.target.value)
             }}
@@ -164,6 +174,7 @@ export default function App() {
             {disciplines.map((item) => (
               <option key={item.id} value={item.id}>{item.title}{item.builtin ? '' : ' (uploaded)'}</option>
             ))}
+            <option value="custom">Custom...</option>
           </select>
           <button type="button" onClick={() => setSetupOpen(true)}>Setup</button>
         </div>
@@ -262,13 +273,22 @@ export default function App() {
       {setupOpen ? (
         <SetupDialog
           catalog={catalog}
-          discipline={discipline}
-          onUploadSkill={onUploadSkill}
-          onRemoveSkill={removeCustom}
           onClose={() => setSetupOpen(false)}
           onSaved={() => setConnection(activeConnection())}
         />
       ) : null}
+      {skillOpen ? (
+        <SkillDialog
+          skills={customSkills}
+          onUpload={onUploadSkill}
+          onRemove={removeCustom}
+          onAdd={addSkill}
+          onClose={() => setSkillOpen(false)}
+        />
+      ) : null}
+      <footer className="site-footer">
+        <a href="https://www.samthiele.science/" target="_blank" rel="noreferrer">Sam Thiele 2026</a>
+      </footer>
     </div>
   )
 }

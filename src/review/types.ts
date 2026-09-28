@@ -1,5 +1,26 @@
 export type ParagraphKind = 'body' | 'heading' | 'table' | 'preamble' | 'skip'
 
+export type InlineStyle = 'bold' | 'italic' | 'underline' | 'subscript' | 'superscript'
+
+export type InlineMark = {
+  start: number
+  end: number
+  style: InlineStyle
+}
+
+export type TextLink = {
+  start: number
+  end: number
+  href: string
+}
+
+export type TableCellRef = {
+  docxIndex: number
+  text: string
+  start: number
+  end: number
+}
+
 export type Paragraph = {
   id: string
   text: string
@@ -7,6 +28,10 @@ export type Paragraph = {
   section: string
   inTable: boolean
   docxIndex?: number
+  cells?: TableCellRef[]
+  level?: number
+  marks?: InlineMark[]
+  links?: TextLink[]
   texStart?: number
   texEnd?: number
 }

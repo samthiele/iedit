@@ -13,20 +13,13 @@ import {
   type SetupId,
 } from '../llm/setup.ts'
 import { DEFAULT_OPENAI_BASE_URL } from '../llm/storage.ts'
-import type { DisciplineSkill } from '../skills/index.ts'
 
 export function SetupDialog({
   catalog,
-  discipline,
-  onUploadSkill,
-  onRemoveSkill,
   onClose,
   onSaved,
 }: {
   catalog: ModelCatalog | null
-  discipline: DisciplineSkill
-  onUploadSkill: (file: File | undefined) => void
-  onRemoveSkill: (id: string) => void
   onClose: () => void
   onSaved: () => void
 }) {
@@ -150,26 +143,6 @@ export function SetupDialog({
           </button>
         ) : null}
         {message ? <p className="setup-note">{message}</p> : null}
-        <section className="setup-discipline">
-          <h3>Discipline skill</h3>
-          <p className="setup-note">Upload a markdown skill to add it to the discipline menu. The current choice is {discipline.title}.</p>
-          <div className="modal-actions">
-            <label className="file-button">
-              Upload discipline skill
-              <input
-                type="file"
-                accept=".md,text/markdown"
-                onChange={(event) => {
-                  onUploadSkill(event.target.files?.[0])
-                  event.target.value = ''
-                }}
-              />
-            </label>
-            {!discipline.builtin ? (
-              <button type="button" onClick={() => onRemoveSkill(discipline.id)}>Remove uploaded skill</button>
-            ) : null}
-          </div>
-        </section>
         <div className="modal-actions">
           <button type="button" onClick={() => {
             clearSetupKey(tab)

@@ -132,7 +132,7 @@ Samuel T. Thiele1, Gabor Kereszturi2, Michael J. Heap3,4, Andréa de Lima Ribeir
 section: Manuscript
 role: edit
 
-1Helmholtz-Zentrum Dresden-Rossendorf, Helmholtz Institute Freiberg, Chemnitzer Str. 40, 09599 Freiberg, Germany
+1Research institute, Helmholtz Institute Freiberg, Chemnitzer Str. 40, 09599 Freiberg, Germany
 
 ### p-004
 section: Manuscript
@@ -168,7 +168,7 @@ role: edit
 section: Manuscript
 role: edit
 
-Correspondence to: Samuel T Thiele (s.thiele@hzdr.de)
+Correspondence to: Samuel T Thiele (s.thiele@example.de)
 
 ### p-010
 section: Manuscript

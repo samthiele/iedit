@@ -1,3 +1,5 @@
+import type { InlineMark, InlineStyle, TextLink } from '../review/types.ts'
+
 export const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 export const W14 = 'http://schemas.microsoft.com/office/word/2010/wordml'
 export const W15 = 'http://schemas.microsoft.com/office/word/2012/wordml'
@@ -62,9 +64,16 @@ export type TextPiece = {
   end: number
 }
 
-export function visiblePieces(paragraph: Element): { text: string; pieces: TextPiece[] } {
+export function visiblePieces(
+  paragraph: Element,
+  rels: ReadonlyMap<string, string> = new Map(),
+): { text: string; pieces: TextPiece[]; marks: InlineMark[]; links: TextLink[] } {
   const pieces: TextPiece[] = []
+  const marks: InlineMark[] = []
+  const links: TextLink[] = []
   let text = ''
+  let fieldUrl: string | null = null
+  let fieldResult = false
 
   const walk = (node: Node, inDeletion: boolean) => {
     if (node.nodeType !== 1) return
@@ -75,6 +84,24 @@ export function visiblePieces(paragraph: Element): { text: string; pieces: TextP
       return
     }
     if (inDeletion || name === 'delText') return
+    if (name === 'instrText') {
+      const match = /HYPERLINK\s+"([^"]+)"/i.exec(element.textContent ?? '')
+      if (match) fieldUrl = match[1]
+      return
+    }
+    if (name === 'fldChar') {
+      const type = qattr(element, 'fldCharType')
+      if (type === 'begin') {
+        fieldUrl = null
+        fieldResult = false
+      } else if (type === 'separate') {
+        fieldResult = Boolean(fieldUrl)
+      } else if (type === 'end') {
+        fieldUrl = null
+        fieldResult = false
+      }
+      return
+    }
     if (name === 't') {
       const run = nearestRun(element)
       if (!run) return
@@ -82,13 +109,90 @@ export function visiblePieces(paragraph: Element): { text: string; pieces: TextP
       const start = text.length
       text += value
       pieces.push({ textEl: element, run, start, end: text.length })
+      for (const style of runEmphasis(run)) marks.push({ start, end: text.length, style })
+      const href = hyperlinkHref(element, rels) ?? (fieldResult ? fieldUrl : null)
+      if (href) links.push({ start, end: text.length, href })
       return
     }
     for (const child of element.childNodes) walk(child, inDeletion)
   }
 
   walk(paragraph, false)
-  return { text, pieces }
+  return { text, pieces, marks: mergeMarks(marks), links: mergeLinks(links) }
+}
+
+function runEmphasis(run: Element): InlineStyle[] {
+  const props = [...run.childNodes].find((node): node is Element => (
+    node.nodeType === 1 && (node as Element).localName === 'rPr'
+  ))
+  if (!props) return []
+  const styles: InlineStyle[] = []
+  if (emphasisOn(props, 'b') || emphasisOn(props, 'bCs')) styles.push('bold')
+  if (emphasisOn(props, 'i') || emphasisOn(props, 'iCs')) styles.push('italic')
+  if (emphasisOn(props, 'u')) styles.push('underline')
+  const align = [...props.childNodes].find((node): node is Element => (
+    node.nodeType === 1 && (node as Element).localName === 'vertAlign'
+  ))
+  const vertical = align ? qattr(align, 'val') : ''
+  if (vertical === 'subscript') styles.push('subscript')
+  if (vertical === 'superscript') styles.push('superscript')
+  return styles
+}
+
+function emphasisOn(props: Element, name: string): boolean {
+  const node = [...props.childNodes].find((child): child is Element => (
+    child.nodeType === 1 && (child as Element).localName === name
+  ))
+  if (!node) return false
+  const value = qattr(node, 'val').toLowerCase()
+  return value !== '0' && value !== 'false' && value !== 'off' && value !== 'none'
+}
+
+function mergeMarks(marks: InlineMark[]): InlineMark[] {
+  const merged: InlineMark[] = []
+  for (const style of ['bold', 'italic'] as const) {
+    const group = marks.filter((mark) => mark.style === style && mark.end > mark.start).sort((a, b) => a.start - b.start)
+    let current: InlineMark | null = null
+    for (const mark of group) {
+      if (current && mark.start <= current.end) {
+        current.end = Math.max(current.end, mark.end)
+      } else {
+        if (current) merged.push(current)
+        current = { style: mark.style, start: mark.start, end: mark.end }
+      }
+    }
+    if (current) merged.push(current)
+  }
+  return merged
+}
+
+function mergeLinks(links: TextLink[]): TextLink[] {
+  const sorted = links.filter((link) => link.href && link.end > link.start).sort((a, b) => a.start - b.start)
+  const merged: TextLink[] = []
+  for (const link of sorted) {
+    const current = merged.at(-1)
+    if (current && current.href === link.href && link.start <= current.end) {
+      current.end = Math.max(current.end, link.end)
+    } else {
+      merged.push({ ...link })
+    }
+  }
+  return merged
+}
+
+function hyperlinkHref(element: Element, rels: ReadonlyMap<string, string>): string | null {
+  let node: Node | null = element
+  while (node) {
+    if (node.nodeType === 1 && (node as Element).localName === 'hyperlink') {
+      const link = node as Element
+      const anchor = qattr(link, 'anchor')
+      if (anchor) return `#${anchor}`
+      const id = link.getAttributeNS(OFFICE_REL, 'id') || link.getAttribute('r:id') || ''
+      return rels.get(id) ?? null
+    }
+    node = node.parentNode
+  }
+  return null
 }
 
 function nearestRun(element: Element): Element | null {

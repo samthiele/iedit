@@ -19,7 +19,8 @@ import {
   wordDate,
   type TextPiece,
 } from '../ooxml/xml.ts'
-import type { Author, DiffSegment, LoadedDocument, Suggestion } from '../review/types.ts'
+import { wordDiff } from '../review/diff.ts'
+import type { Author, DiffSegment, LoadedDocument, Paragraph, Suggestion, TableCellRef } from '../review/types.ts'
 import { editedStem } from '../review/types.ts'
 
 const COMMENTS_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml'
@@ -38,13 +39,16 @@ export async function exportDocx(document: LoadedDocument, suggestions: Suggesti
 
   for (const suggestion of included) {
     const paragraph = document.paragraphs.find((item) => item.id === suggestion.paraId)
-    if (!paragraph || paragraph.docxIndex === undefined) continue
-    const list = byParagraph.get(paragraph.docxIndex) ?? []
-    list.push(suggestion)
-    byParagraph.set(paragraph.docxIndex, list)
+    const target = paragraph ? tableTarget(paragraph, suggestion) : null
+    if (!target) continue
+    const list = byParagraph.get(target.docxIndex) ?? []
+    list.push(target.suggestion)
+    byParagraph.set(target.docxIndex, list)
   }
 
-  let revisionId = maxRevisionId(doc) + 1
+  let revisionId = maxMarkupId(doc) + 1
+  const existingComments = zip.file('word/comments.xml')
+  if (existingComments) revisionId = Math.max(revisionId, maxMarkupId(parseXml(await existingComments.async('string'))) + 1)
   const notes: CommentNote[] = []
 
   for (const [index, items] of byParagraph) {
@@ -73,6 +77,48 @@ type CommentNote = {
   author: Author
   body: string
   paraId: string
+}
+
+function tableTarget(
+  paragraph: Paragraph,
+  suggestion: Suggestion,
+): { docxIndex: number; suggestion: Suggestion } | null {
+  if (!paragraph.cells || paragraph.cells.length === 0) {
+    if (paragraph.docxIndex === undefined) return null
+    return { docxIndex: paragraph.docxIndex, suggestion }
+  }
+  if (!suggestion.span || !suggestion.find) {
+    return { docxIndex: paragraph.cells[0].docxIndex, suggestion: { ...suggestion, span: null, segments: [] } }
+  }
+  const cell = paragraph.cells.find((item) => suggestion.span!.start >= item.start && suggestion.span!.end <= item.end)
+  if (!cell) return null
+  const localStart = plainOffset(cell, suggestion.span.start - cell.start)
+  const localEnd = plainOffset(cell, suggestion.span.end - cell.start)
+  const find = cell.text.slice(localStart, localEnd)
+  if (!find) return null
+  const insert = suggestion.insert.replaceAll('\\|', '|')
+  return {
+    docxIndex: cell.docxIndex,
+    suggestion: {
+      ...suggestion,
+      find,
+      insert,
+      span: { start: localStart, end: localEnd },
+      segments: wordDiff(find, insert),
+    },
+  }
+}
+
+function plainOffset(cell: TableCellRef, escapedOffset: number): number {
+  let plainIndex = 0
+  let index = 0
+  while (plainIndex < cell.text.length) {
+    const step = cell.text[plainIndex] === '|' ? 2 : 1
+    if (index + step > escapedOffset) break
+    index += step
+    plainIndex += 1
+  }
+  return plainIndex
 }
 
 function applySuggestion(
@@ -104,45 +150,24 @@ function applySuggestion(
   }
 
   const { start, end } = suggestion.span
-  splitAt(paragraph, start)
-  splitAt(paragraph, end)
-  const { pieces } = visiblePieces(paragraph)
-  const inside = pieces.filter((piece) => piece.start >= start && piece.end <= end)
-  if (inside.length === 0) {
-    return { nextId, comment: null }
-  }
-
-  const runs = uniqueRuns(inside, pieces, start, end)
-  const parent = runs[0]?.parentNode
-  if (!parent) return { nextId, comment: null }
-  const anchor = runs[runs.length - 1].nextSibling
-  const rPr = descendants(runs[0], 'rPr')[0]?.cloneNode(true) as Element | null
-  for (const run of runs) run.remove()
-
   const doc = paragraph.ownerDocument
   if (!doc) return { nextId, comment: null }
-  if (suggestion.status === 'accepted') {
-    const nodes = bakedNodes(doc, rPr, suggestion)
-    for (const node of nodes) {
-      if (anchor) parent.insertBefore(node, anchor)
-      else parent.appendChild(node)
+  let placed = false
+  const applied = spliceVisibleSpan(paragraph, start, end, (properties) => {
+    placed = true
+    if (suggestion.status === 'accepted') return bakedNodes(doc, properties, suggestion)
+    const nodes: Node[] = [commentMarker(doc, 'commentRangeStart', commentId)]
+    for (const segment of suggestion.segments) {
+      if (!segment.text) continue
+      const revision = revisionNode(doc, properties, segment, visual, author, nextId)
+      nextId = revision.nextId
+      nodes.push(revision.node)
     }
-    return { nextId, comment: null }
-  }
-
-  const nodes: Node[] = [commentMarker(doc, 'commentRangeStart', commentId)]
-  for (const segment of suggestion.segments) {
-    if (!segment.text) continue
-    const revision = revisionNode(doc, rPr, segment, visual, author, nextId)
-    nextId = revision.nextId
-    nodes.push(revision.node)
-  }
-  nodes.push(commentMarker(doc, 'commentRangeEnd', commentId))
-  nodes.push(commentReference(doc, commentId))
-  for (const node of nodes) {
-    if (anchor) parent.insertBefore(node, anchor)
-    else parent.appendChild(node)
-  }
+    nodes.push(commentMarker(doc, 'commentRangeEnd', commentId))
+    nodes.push(commentReference(doc, commentId))
+    return nodes
+  })
+  if (!applied || !placed || suggestion.status === 'accepted') return { nextId, comment: null }
 
   return {
     nextId,
@@ -161,6 +186,115 @@ function bakedNodes(doc: Document, rPr: Element | null, suggestion: Suggestion):
     ? segments
     : (suggestion.insert ? [{ text: suggestion.insert }] : [])
   return text.map((segment) => textRun(doc, rPr, segment.text, 't'))
+}
+
+function spliceVisibleSpan(
+  paragraph: Element,
+  start: number,
+  end: number,
+  build: (properties: Element | null) => Node[],
+): boolean {
+  splitAt(paragraph, start)
+  splitAt(paragraph, end)
+  const { pieces } = visiblePieces(paragraph)
+  const inside = pieces.filter((piece) => piece.start >= start && piece.end <= end)
+  const runs = uniqueRuns(inside, pieces, start, end)
+  if (runs.length === 0) return false
+  const isolated = runs.map((run) => isolateRevision(run, paragraph))
+  const blocks = isolated.every((block) => block.parentNode === isolated[0].parentNode)
+    ? isolated
+    : [...new Set(isolated.map((block) => paragraphChild(block, paragraph)))]
+  const first = blocks[0]
+  const last = blocks[blocks.length - 1]
+  const parent = first.parentNode
+  if (!parent || last.parentNode !== parent) return false
+  const carried = nodesBetween(first, last).filter(isCommentFurniture)
+  for (const marker of carried) (marker as Element).remove()
+  const properties = descendants(runs[0], 'rPr')[0]?.cloneNode(true) as Element | null
+  const doc = paragraph.ownerDocument
+  if (!doc) return false
+  for (const node of wrapCarriedMarkers(build(properties), carried)) parent.insertBefore(node, first)
+  for (const run of runs) run.remove()
+  for (const block of blocks) removeEmptyRevision(block, paragraph)
+  return true
+}
+
+function paragraphChild(node: Element, paragraph: Element): Element {
+  let current = node
+  while (current.parentElement && current.parentElement !== paragraph) current = current.parentElement
+  return current
+}
+
+function isolateRevision(run: Element, paragraph: Element): Element {
+  let node = run
+  while (node.parentElement && node.parentElement !== paragraph) {
+    const parent = node.parentElement
+    if (parent.localName !== 'ins' && parent.localName !== 'del') break
+    splitRevisionAfter(parent, node)
+    splitRevisionBefore(parent, node)
+    node = parent
+  }
+  return node
+}
+
+function splitRevisionAfter(revision: Element, run: Element) {
+  const following: Node[] = []
+  let sibling = run.nextSibling
+  while (sibling) {
+    following.push(sibling)
+    sibling = sibling.nextSibling
+  }
+  if (following.length === 0 || !revision.parentNode) return
+  const clone = revision.cloneNode(false) as Element
+  for (const item of following) clone.appendChild(item)
+  revision.parentNode.insertBefore(clone, revision.nextSibling)
+}
+
+function splitRevisionBefore(revision: Element, run: Element) {
+  if (!revision.parentNode || ![...revision.childNodes].some((child) => child !== run)) return
+  const clone = revision.cloneNode(false) as Element
+  revision.parentNode.insertBefore(clone, revision.nextSibling)
+  clone.appendChild(run)
+}
+
+function nodesBetween(first: Node, last: Node): Node[] {
+  const found: Node[] = []
+  let cursor = first.nextSibling
+  while (cursor && cursor !== last) {
+    found.push(cursor)
+    cursor = cursor.nextSibling
+  }
+  return found
+}
+
+function isCommentFurniture(node: Node): boolean {
+  if (node.nodeType !== 1) return false
+  const element = node as Element
+  if (element.localName === 'commentRangeStart' || element.localName === 'commentRangeEnd') return true
+  return element.localName === 'r'
+    && descendants(element, 'commentReference').length > 0
+    && descendants(element, 't').length === 0
+    && descendants(element, 'delText').length === 0
+}
+
+function wrapCarriedMarkers(nodes: Node[], carried: Node[]): Node[] {
+  const starts: Node[] = []
+  const ends: Node[] = []
+  const references: Node[] = []
+  for (const marker of carried) {
+    const name = (marker as Element).localName
+    if (name === 'commentRangeStart') starts.push(marker)
+    else if (name === 'commentRangeEnd') ends.push(marker)
+    else references.push(marker)
+  }
+  return [...starts, ...nodes, ...ends.reverse(), ...references]
+}
+
+function removeEmptyRevision(block: Element, paragraph: Element) {
+  if (block === paragraph || (block.localName !== 'ins' && block.localName !== 'del')) return
+  const hasText = descendants(block, 't').some((item) => item.textContent)
+    || descendants(block, 'delText').some((item) => item.textContent)
+  if (!hasText) block.remove()
 }
 
 function uniqueRuns(inside: TextPiece[], pieces: TextPiece[], start: number, end: number): Element[] {
@@ -260,12 +394,16 @@ function commentReference(doc: Document, id: number): Element {
   return run
 }
 
-function maxRevisionId(doc: XMLDocument): number {
+function maxMarkupId(doc: XMLDocument): number {
   let max = 999
   const walk = (node: Node) => {
     if (node.nodeType !== 1) return
     const element = node as Element
-    if (element.localName === 'del' || element.localName === 'ins') {
+    const name = element.localName
+    if (
+      name === 'del' || name === 'ins' || name === 'comment'
+      || name === 'commentRangeStart' || name === 'commentRangeEnd' || name === 'commentReference'
+    ) {
       const id = Number(qattr(element, 'id'))
       if (Number.isFinite(id)) max = Math.max(max, id)
     }

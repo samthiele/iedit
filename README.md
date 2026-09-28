@@ -1,21 +1,15 @@
 # iEdit
 
-Static manuscript review. Upload a Word or LaTeX file, bring a Gemini key or an OpenAI-compatible key, and review sentence-level suggestions before downloading a redlined `.docx` or `.tex` file.
+iEdit uses an LLM to turn a Word manuscript into track-changes text. You upload a `.docx`, the LLM reviews it to create comments and track-change suggestions, that can then be viewed in the browser or downloaded as a `.docx` for local revision and editing.
 
-The manuscript is read in the browser. The API key stays in local storage and is sent only to the provider you choose.
+This approach keeps you in charge, while leveraging LLMs to provide hopefully constructive guidance and critique. More powerful models (especially those able to conduct web-searches) typically produce better results, especially when it comes to fact-checking science claims.
 
-```bash
-npm install
-npm test
-npm run dev
-```
+---
 
-GitHub Pages build:
+**Important note**: The file is read only by your browser, but a markdown version of it will be sent to the LLM provider you have selected. For public LLMs this can have important privacy or confidentiality implications. 
 
-```bash
-npm run build:pages
-```
+---
 
-The pages workflow publishes `dist` from the `main` branch. The Vite base path for that build is `/iedit/`.
+Your API keys stay in this browser, and are sent only to the corresponding model providers.   
 
-Discipline skills live in `src/skills/`. `scientific-writing.md` is always sent to Gemini. `src/skills/disciplines/geoscience.md` is the built-in field skill. More disciplines are further markdown files in that folder, each with a `title` in frontmatter. The page can also upload a discipline skill, which is stored only in the browser.
+Live site: [samthiele.github.io/iedit](https://samthiele.github.io/iedit/)

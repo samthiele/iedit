@@ -1,5 +1,5 @@
 import { wordDiff } from './diff.ts'
-import { locateSpan } from './span.ts'
+import { locateFormatted, plainInsert } from './richText.ts'
 import type { Author, Paragraph, Suggestion } from './types.ts'
 
 export type RawEdit = {
@@ -115,13 +115,14 @@ export function bindEdits(
       return
     }
 
-    const located = locateSpan(paragraph.text, edit.find)
+    const located = locateFormatted(paragraph, edit.find)
+    const insert = plainInsert(edit.insert)
     if (!located) {
       unmatched.push(`${edit.paraId}: “${trimQuote(edit.find)}” was not found verbatim`)
       return
     }
 
-    if (located.actual === edit.insert) {
+    if (located.actual === insert) {
       if (!edit.comment.trim()) return
       suggestions.push({
         id: `${options.idPrefix}-${index + 1}`,
@@ -142,12 +143,12 @@ export function bindEdits(
       id: `${options.idPrefix}-${index + 1}`,
       paraId: edit.paraId,
       find: located.actual,
-      insert: edit.insert,
+      insert,
       comment: edit.comment || 'No explanation was returned with this suggestion.',
       author: edit.author,
       status: 'pending',
       span: { start: located.start, end: located.end },
-      segments: wordDiff(located.actual, edit.insert),
+      segments: wordDiff(located.actual, insert),
       grounded: options.grounded,
     })
   })

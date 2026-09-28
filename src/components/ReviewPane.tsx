@@ -1,9 +1,12 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import Markdown from 'react-markdown'
+import { createElement, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import Markdown, { type Components } from 'react-markdown'
+import rehypeRaw from 'rehype-raw'
+import remarkGfm from 'remark-gfm'
 import { docxFileName, exportDocx } from '../export/docx.ts'
 import { markdownFileName, reviewMarkdown } from '../export/markdown.ts'
 import { exportTex, texFileName } from '../export/tex.ts'
-import type { ReviewSession, Suggestion, SuggestionStatus } from '../review/types.ts'
+import { manuscriptSource } from '../review/manuscriptMarkdown.ts'
+import type { Paragraph, ReviewSession, Suggestion, SuggestionStatus } from '../review/types.ts'
 
 export function ReviewPane({
   session,
@@ -131,33 +134,15 @@ function ParagraphReview({
 
   return (
     <div className="para-row" ref={rowRef}>
-      <p className={`para-line para-${paragraph.kind}${hoverWhole ? ' is-hovered' : ''}`}>
-        {pieces(paragraph.text, notes).map((piece, index) => {
-          if (piece.kind === 'text') return <span key={index}>{piece.text}</span>
-          const hot = piece.suggestion.id === hoverId
-          if (piece.kind === 'plain') {
-            return (
-              <span
-                className={hot ? 'suggest-mark is-hot' : 'suggest-mark'}
-                key={piece.suggestion.id}
-                data-suggestion={piece.suggestion.id}
-              >
-                {piece.text}
-              </span>
-            )
-          }
-          return (
-            <span className={hot ? 'redline is-hot' : 'redline'} key={piece.suggestion.id} data-suggestion={piece.suggestion.id}>
-              {piece.suggestion.segments.map((segment, segmentIndex) => {
-                if (!segment.text) return null
-                if (segment.type === 'delete') return <span className="del" key={segmentIndex}>{segment.text}</span>
-                if (segment.type === 'insert') return <span className="ins" key={segmentIndex}>{segment.text}</span>
-                return <span key={segmentIndex}>{segment.text}</span>
-              })}
-            </span>
-          )
-        })}
-      </p>
+      <div className={`para-line para-${paragraph.kind}${hoverWhole ? ' is-hovered' : ''}`}>
+        <Markdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw]}
+          components={markdownComponents(paragraph)}
+        >
+          {manuscriptSource(paragraph.text, notes, paragraph.marks, hoverId, paragraph.links)}
+        </Markdown>
+      </div>
       <div className="comment-rail">
         {notes.map((suggestion) => (
           <CommentBubble
@@ -214,12 +199,16 @@ function CommentBubble({
   )
 }
 
-type Piece =
-  | { kind: 'text'; text: string }
-  | { kind: 'plain'; suggestion: Suggestion; text: string }
-  | { kind: 'redline'; suggestion: Suggestion }
-
 const COMMENT_GAP_REM = 1
+
+function markdownComponents(paragraph: Paragraph): Components | undefined {
+  if (paragraph.kind !== 'heading') return undefined
+  const level = Math.min(6, Math.max(1, paragraph.level ?? 2))
+  const tag = `h${level}` as 'h1'
+  return {
+    p: ({ children }) => createElement(tag, { className: 'md-heading' }, children),
+  }
+}
 
 export function stackCommentTops(desiredTops: number[], heights: number[], gap: number): number[] {
   const order = desiredTops
@@ -274,31 +263,6 @@ function orderedNotes(suggestions: Suggestion[]): Suggestion[] {
     .map((suggestion, index) => ({ suggestion, index }))
     .sort((a, b) => (a.suggestion.span?.start ?? Number.POSITIVE_INFINITY) - (b.suggestion.span?.start ?? Number.POSITIVE_INFINITY) || a.index - b.index)
     .map((item) => item.suggestion)
-}
-
-function pieces(text: string, suggestions: Suggestion[]): Piece[] {
-  const ranged = suggestions
-    .filter((suggestion) => suggestion.span)
-    .sort((a, b) => (a.span?.start ?? 0) - (b.span?.start ?? 0))
-  const out: Piece[] = []
-  let cursor = 0
-  for (const suggestion of ranged) {
-    const span = suggestion.span
-    if (!span || span.start < cursor) continue
-    if (span.start > cursor) out.push({ kind: 'text', text: text.slice(cursor, span.start) })
-    if (suggestion.status === 'pending') {
-      out.push({ kind: 'redline', suggestion })
-    } else if (suggestion.status === 'accepted') {
-      const baked = suggestion.segments.filter((segment) => segment.type !== 'delete').map((segment) => segment.text).join('')
-      out.push({ kind: 'plain', suggestion, text: baked || suggestion.insert })
-    } else {
-      out.push({ kind: 'plain', suggestion, text: text.slice(span.start, span.end) })
-    }
-    cursor = span.end
-  }
-  if (cursor < text.length) out.push({ kind: 'text', text: text.slice(cursor) })
-  if (out.length === 0) out.push({ kind: 'text', text })
-  return out
 }
 
 function downloadMarkdown(session: ReviewSession) {

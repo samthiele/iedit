@@ -108,6 +108,48 @@ describe('review comments', () => {
     expect(rejected?.textContent).not.toContain('specifically')
     expect(rejected?.querySelector('.redline')).toBeNull()
   })
+
+  it('renders headings, emphasis, and pipe tables', async () => {
+    const session = fixture('pending')
+    session.document.paragraphs = [
+      {
+        id: 'p-001',
+        text: 'Models such as transformers.',
+        kind: 'heading',
+        level: 2,
+        section: 'Introduction',
+        inTable: false,
+        marks: [{ start: 0, end: 6, style: 'bold' }],
+      },
+      {
+        id: 'p-002',
+        text: 'A *measured* value with p < 0.05.',
+        kind: 'body',
+        section: 'Introduction',
+        inTable: false,
+      },
+      {
+        id: 'p-003',
+        text: '| Mineral | Band |\n| --- | --- |\n| H2O | 1800–2120 |',
+        kind: 'table',
+        section: 'Introduction',
+        inTable: true,
+      },
+    ]
+    root = createRoot(host)
+    await act(async () => {
+      root?.render(<ReviewPane session={session} onChange={() => undefined} />)
+    })
+    expect(host.querySelector('h2.md-heading')?.textContent).toContain('Models')
+    expect(host.querySelector('h2 strong')?.textContent).toBe('Models')
+    expect(host.querySelector('em')?.textContent).toBe('measured')
+    expect(host.textContent).toContain('p < 0.05')
+    const table = host.querySelector('table')
+    expect(table?.querySelectorAll('th')).toHaveLength(2)
+    expect(table?.textContent).toContain('H2O')
+    expect(table?.textContent).not.toContain('---')
+    expect(host.querySelector('.del')?.textContent).toBe('such as')
+  })
 })
 
 function fixture(status: SuggestionStatus): ReviewSession {
