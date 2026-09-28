@@ -58,7 +58,7 @@ async function loadFixture(): Promise<ReviewSession> {
     fetch(`${base}__fixtures/testManuscript.docx`),
   ])
   if (!logResponse.ok || !docxResponse.ok) {
-    throw new Error('Could not read test/chatLog.txt and test/testManuscript.docx. Start the site with ./launch.sh so those files are served.')
+    throw new Error('Could not read the saved chat log and manuscript for this demo.')
   }
   const log = parseChatLog(await logResponse.text())
   const docx = new File([await docxResponse.arrayBuffer()], 'testManuscript.docx')
