@@ -1,80 +1,103 @@
-import type { Author, LoadedDocument, Suggestion } from '../review/types.ts'
+import type { LoadedDocument, Paragraph, Suggestion } from '../review/types.ts'
 import { editedStem } from '../review/types.ts'
-
-const PREAMBLE_LINES = [
-  '\\usepackage{xcolor}',
-  '\\usepackage{hyperref}',
-  '\\usepackage[markup=default]{changes}',
-  '\\definechangesauthor[name={AI copyedit}, color=blue]{AI-copyedit}',
-  '\\definechangesauthor[name={AI science}, color=orange]{AI-science}',
-  '\\setaddedmarkup{\\textcolor{blue}{#1}}',
-  '\\setdeletedmarkup{\\textcolor{red}{\\sout{#1}}}',
-  '\\usepackage[date=false, time=false]{pdfcomment}',
-]
 
 export function exportTex(document: LoadedDocument, suggestions: Suggestion[]): string {
   const source = document.tex ?? ''
   const included = suggestions.filter((item) => item.status !== 'rejected')
   const placed = included.flatMap((suggestion) => {
     const paragraph = document.paragraphs.find((item) => item.id === suggestion.paraId)
-    if (!paragraph || paragraph.texStart === undefined || paragraph.texEnd === undefined) return []
-    if (!suggestion.find) {
-      if (suggestion.status === 'accepted') return []
-      return [{ suggestion, start: paragraph.texEnd }]
-    }
-    const local = paragraph.text.indexOf(suggestion.find)
-    if (local < 0) return []
-    return [{ suggestion, start: paragraph.texStart + local }]
+    const range = sourceRange(paragraph, suggestion)
+    return range ? [{ suggestion, ...range }] : []
   }).sort((a, b) => b.start - a.start)
 
   let next = source
-  let needsMarkup = false
   for (const item of placed) {
-    if (item.suggestion.status !== 'accepted') needsMarkup = true
-    next = applyAt(next, item.start, item.suggestion)
+    next = applyAt(next, item.start, item.end, item.suggestion)
   }
-  return needsMarkup ? ensurePreamble(next) : next
+  return ensurePdfcomment(next)
 }
 
 export function texFileName(fileName: string): string {
   return `${editedStem(fileName)}.tex`
 }
 
-function applyAt(source: string, start: number, suggestion: Suggestion): string {
-  if (suggestion.status === 'accepted') {
-    if (!suggestion.find) return source
-    if (source.slice(start, start + suggestion.find.length) !== suggestion.find) return source
-    return source.slice(0, start) + suggestion.insert + source.slice(start + suggestion.find.length)
-  }
-  const note = pdfComment(suggestion.comment, suggestion.author)
+function sourceRange(
+  paragraph: Paragraph | undefined,
+  suggestion: Suggestion,
+): { start: number; end: number } | null {
+  if (!paragraph || paragraph.texStart === undefined || paragraph.texEnd === undefined) return null
   if (!suggestion.find) {
-    return `${source.slice(0, start)}${note}${source.slice(start)}`
+    if (suggestion.status === 'accepted') return null
+    return { start: paragraph.texEnd, end: paragraph.texEnd }
   }
-  if (source.slice(start, start + suggestion.find.length) !== suggestion.find) return source
-  const replacement = suggestion.insert
-    ? `\\replaced[id=AI-copyedit]{${suggestion.insert}}{${suggestion.find}}${note}`
-    : `\\deleted[id=AI-copyedit]{${suggestion.find}}${note}`
-  return source.slice(0, start) + replacement + source.slice(start + suggestion.find.length)
+  const map = paragraph.texMap
+  const span = suggestion.span
+  const local = span && span.end > span.start
+    ? span
+    : (() => {
+      const at = paragraph.text.indexOf(suggestion.find)
+      return at < 0 ? null : { start: at, end: at + suggestion.find.length }
+    })()
+  if (map && local && local.end <= map.length && local.end > local.start) {
+    const start = map[local.start].start
+    const end = map[local.end - 1].end
+    if (end > start) return { start, end }
+  }
+  if (!map) {
+    const at = paragraph.text.indexOf(suggestion.find)
+    if (at < 0) return null
+    return { start: paragraph.texStart + at, end: paragraph.texStart + at + suggestion.find.length }
+  }
+  return null
 }
 
-function pdfComment(comment: string, author: Author): string {
-  if (author === 'AI-science') {
-    return `\\pdfcomment[icon=Comment,color=orange,author={AI science},subject={science}]{${escapeTex(comment)}}`
+function applyAt(source: string, start: number, end: number, suggestion: Suggestion): string {
+  if (suggestion.status === 'accepted') {
+    if (!suggestion.find) return source
+    return source.slice(0, start) + suggestion.insert + source.slice(end)
   }
-  return `\\pdfcomment[icon=Note,color=blue,author={AI copyedit},subject={copyedit}]{${escapeTex(comment)}}`
+  const author = suggestion.author.trim() || 'iEdit'
+  if (!suggestion.find) {
+    const note = pdfComment(author, suggestion.comment)
+    if (!note) return source
+    return `${source.slice(0, start)}${note}${source.slice(start)}`
+  }
+  const deleted = source.slice(start, end)
+  return source.slice(0, start) + pendingWording(deleted, suggestion.insert, suggestion.comment, author) + source.slice(end)
+}
+
+function pendingWording(deleted: string, insert: string, comment: string, author: string): string {
+  if (deleted.includes('\\')) {
+    const parts = [comment.trim()]
+    if (insert.trim()) parts.push(`Suggested: ${insert.trim()}`)
+    const note = pdfComment(author, parts.filter(Boolean).join(' '))
+    return deleted + note
+  }
+  const marked = `\\pdfmarkupcomment[markup=StrikeOut,author={${escapeTex(author)}}]{${deleted}}{${escapeTex(comment.trim())}}`
+  const replacement = insert ? escapeTex(insert) : ''
+  return replacement ? `${marked}\n${replacement}` : marked
+}
+
+function pdfComment(author: string, comment: string): string {
+  const text = comment.trim()
+  if (!text) return ''
+  return ` \\pdfcomment[author={${escapeTex(author)}},icon=Comment]{${escapeTex(text)}}`
+}
+
+function ensurePdfcomment(source: string): string {
+  if (!source.includes('\\pdfmarkupcomment') && !source.includes('\\pdfcomment')) return source
+  if (/\\(?:usepackage|RequirePackage)(?:\[[^\]]*\])?\{[^}]*\bpdfcomment\b/.test(source)) return source
+  const marker = '\\begin{document}'
+  const at = source.indexOf(marker)
+  const line = '\\usepackage{pdfcomment}\n'
+  if (at < 0) return line + source
+  return source.slice(0, at) + line + source.slice(at)
 }
 
 function escapeTex(value: string): string {
   return value
     .replace(/\\/g, '\\textbackslash{}')
-    .replace(/([%{}])/g, '\\$1')
-}
-
-function ensurePreamble(source: string): string {
-  const missing = PREAMBLE_LINES.filter((line) => !source.includes(line))
-  if (missing.length === 0) return source
-  const block = `${missing.join('\n')}\n`
-  const begin = source.indexOf('\\begin{document}')
-  if (begin >= 0) return `${source.slice(0, begin)}${block}${source.slice(begin)}`
-  return `${block}\n${source}`
+    .replace(/([&%$#_{}])/g, '\\$1')
+    .replace(/~/g, '\\textasciitilde{}')
+    .replace(/\^/g, '\\textasciicircum{}')
 }

@@ -16,12 +16,12 @@ export function reviewMarkdown(session: ReviewSession): string {
 
   if (session.scienceRan) {
     lines.push(
-      'Science comments use Gemini Google Search grounding. That is narrower than a full literature check.',
+      'Science comments use a web search. That is narrower than a full literature check.',
       '',
     )
   }
   if (session.sources.length > 0) {
-    lines.push('## Sources returned by grounding', '')
+    lines.push('## Sources returned by search', '')
     for (const source of session.sources) {
       lines.push(`- ${source.title}: ${source.uri}`)
     }

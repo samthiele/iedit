@@ -1,4 +1,5 @@
 import { GoogleGenAI, type GroundingMetadata } from '@google/genai'
+import { logExchange } from './log.ts'
 import type { LlmProvider } from './storage.ts'
 import type { GroundingSource } from '../review/types.ts'
 
@@ -25,7 +26,7 @@ export async function generateReview(options: {
 }): Promise<ReviewReply> {
   if (options.provider === 'openai') return generateOpenAi(options)
   const ai = new GoogleGenAI({ apiKey: options.apiKey })
-  const response = await ai.models.generateContent({
+  const request = {
     model: options.model,
     contents: [
       ...(options.history ?? []).map((turn) => ({
@@ -39,20 +40,71 @@ export async function generateReview(options: {
       maxOutputTokens: 32768,
       tools: options.search ? [{ googleSearch: {} }] : undefined,
     },
-  })
-  const metadata = response.candidates?.[0]?.groundingMetadata
-  return {
-    text: response.text ?? '',
-    grounded: isGrounded(metadata),
-    sources: sourcesFrom(metadata),
+  }
+  logExchange('LLM', 'sent', request)
+  try {
+    const response = await ai.models.generateContent(request)
+    const metadata = response.candidates?.[0]?.groundingMetadata
+    const reply = {
+      text: response.text ?? '',
+      grounded: isGrounded(metadata),
+      sources: sourcesFrom(metadata),
+    }
+    logExchange('LLM', 'received', reply)
+    return reply
+  } catch (error) {
+    logExchange('LLM', 'received', { error: error instanceof Error ? error.message : String(error) })
+    throw error
+  }
+}
+
+export async function testConnection(options: {
+  provider: LlmProvider
+  apiKey: string
+  baseUrl?: string
+  model: string
+}): Promise<void> {
+  const apiKey = options.apiKey.trim()
+  const model = options.model.trim()
+  if (!apiKey) throw new Error('Add an API key first.')
+  if (!model) throw new Error('Choose a model first.')
+  if (options.provider === 'openai') {
+    const baseUrl = options.baseUrl?.trim() ?? ''
+    if (!baseUrl) throw new Error('Add a server address first.')
+    await generateOpenAi({
+      apiKey,
+      baseUrl,
+      model,
+      systemInstruction: '',
+      prompt: 'Reply with ok.',
+      maxTokens: 16,
+    })
+    return
+  }
+  const ai = new GoogleGenAI({ apiKey })
+  const request = {
+    model,
+    contents: [{ role: 'user', parts: [{ text: 'Reply with ok.' }] }],
+    config: { maxOutputTokens: 16 },
+  }
+  logExchange('LLM', 'sent', request)
+  try {
+    const response = await ai.models.generateContent(request)
+    logExchange('LLM', 'received', { text: response.text ?? '' })
+  } catch (error) {
+    logExchange('LLM', 'received', { error: error instanceof Error ? error.message : String(error) })
+    throw error
   }
 }
 
 export async function listOpenAiModels(baseUrl: string, apiKey: string): Promise<string[]> {
-  const response = await fetch(`${trimBase(baseUrl)}/models`, {
+  const url = `${trimBase(baseUrl)}/models`
+  logExchange('LLM', 'sent', { url, method: 'GET' })
+  const response = await fetch(url, {
     headers: { Authorization: `Bearer ${apiKey}` },
   })
   const raw = await response.text()
+  logExchange('LLM', 'received', { url, status: response.status, body: raw })
   if (!response.ok) throw new Error(readableGeminiError(new Error(raw || response.statusText)))
   return openAiModelIds(JSON.parse(raw) as unknown)
 }
@@ -64,27 +116,32 @@ async function generateOpenAi(options: {
   systemInstruction: string
   history?: ChatTurn[]
   prompt: string
+  maxTokens?: number
 }): Promise<ReviewReply> {
-  const response = await fetch(`${trimBase(options.baseUrl ?? '')}/chat/completions`, {
+  const url = `${trimBase(options.baseUrl ?? '')}/chat/completions`
+  const body = {
+    model: options.model,
+    messages: [
+      { role: 'system', content: options.systemInstruction },
+      ...(options.history ?? []).map((turn) => ({
+        role: turn.role === 'model' ? 'assistant' : 'user',
+        content: turn.text,
+      })),
+      { role: 'user', content: options.prompt },
+    ],
+    max_tokens: options.maxTokens ?? 16384,
+  }
+  logExchange('LLM', 'sent', { url, body })
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${options.apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: options.model,
-      messages: [
-        { role: 'system', content: options.systemInstruction },
-        ...(options.history ?? []).map((turn) => ({
-          role: turn.role === 'model' ? 'assistant' : 'user',
-          content: turn.text,
-        })),
-        { role: 'user', content: options.prompt },
-      ],
-      max_tokens: 16384,
-    }),
+    body: JSON.stringify(body),
   })
   const raw = await response.text()
+  logExchange('LLM', 'received', { url, status: response.status, body: raw })
   if (!response.ok) throw new Error(readableGeminiError(new Error(raw || response.statusText)))
   return {
     text: openAiMessageText(JSON.parse(raw) as unknown),

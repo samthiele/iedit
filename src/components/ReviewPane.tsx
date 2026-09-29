@@ -34,20 +34,17 @@ export function ReviewPane({
           <button type="button" onClick={() => setAll('rejected')}>Reject all</button>
           <button type="button" onClick={() => downloadMarkdown(session)}>Download notes</button>
           <button type="button" onClick={() => downloadEdited(session)}>
-            Download {session.document.kind === 'docx' ? 'Word' : 'LaTeX'}
+            Download {session.document.kind === 'docx' ? 'Word' : 'Latex'}
           </button>
           <button type="button" onClick={() => openChatLog(session)}>Chat log</button>
         </div>
       </div>
 
-      {session.summary ? (
-        <details className="summary">
-          <summary>Summary</summary>
-          <Markdown>{session.summary}</Markdown>
-        </details>
-      ) : null}
-
-      <ScienceBanner session={session} />
+      <details className="summary">
+        <summary>Summary</summary>
+        {session.summary ? <Markdown>{session.summary}</Markdown> : null}
+        <ScienceNotes session={session} />
+      </details>
 
       {session.warnings.length > 0 ? (
         <ul className="warnings">
@@ -75,14 +72,14 @@ export function ReviewPane({
   )
 }
 
-function ScienceBanner({ session }: { session: ReviewSession }) {
+function ScienceNotes({ session }: { session: ReviewSession }) {
   if (!session.scienceRan) {
-    return <p className="banner">Science pass was not run. Only wording suggestions are shown.</p>
+    return <p>Science pass was not run. Only wording suggestions are shown.</p>
   }
   return (
-    <div className="banner">
+    <>
       <p>
-        Science comments use Gemini Google Search grounding. That is not the full research pass behind geoeditor: sources are whatever search returned, and a note marked “not search-checked” was not verified against the literature.
+        Science comments use a web search. That is narrower than a full literature review: sources are whatever search returned, and a note marked “not search-checked” was not verified against the literature.
       </p>
       {session.scienceError ? <p className="banner-error">{session.scienceError}</p> : null}
       {session.sources.length > 0 ? (
@@ -94,7 +91,7 @@ function ScienceBanner({ session }: { session: ReviewSession }) {
           ))}
         </ul>
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -281,6 +278,14 @@ async function downloadEdited(session: ReviewSession) {
   download(new Blob([exportTex(session.document, session.suggestions)], { type: 'text/plain' }), texFileName(session.document.fileName))
 }
 
+function chatLogPlainText(session: ReviewSession): string {
+  const turns = [
+    { role: 'system', text: session.chatLog.system },
+    ...session.chatLog.turns,
+  ]
+  return turns.map((turn) => `${turn.role}\n${turn.text}`).join('\n\n')
+}
+
 function openChatLog(session: ReviewSession) {
   const page = window.open('', '_blank')
   if (!page) return
@@ -291,6 +296,7 @@ function openChatLog(session: ReviewSession) {
   const blocks = turns.map((turn) => (
     `<section><h2>${escapeHtml(turn.role)}</h2><pre>${escapeHtml(turn.text)}</pre></section>`
   )).join('')
+  const logJson = JSON.stringify(chatLogPlainText(session)).replace(/</g, '\\u003c')
   page.document.open()
   page.document.write(`<!DOCTYPE html>
 <html lang="en">
@@ -299,18 +305,48 @@ function openChatLog(session: ReviewSession) {
   <title>iEdit chat log</title>
   <style>
     body { margin: 0; background: #1e1f22; color: #e8eaed; font: 15px/1.45 'SF Mono', Menlo, Consolas, monospace; }
-    main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
-    h1 { font-size: 1rem; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; }
+    .log-top { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #25262a; border-bottom: 1px solid #3c4043; }
+    h1 { margin: 0; font-size: 1rem; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; }
+    #copy-log { font: inherit; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: #e8eaed; background: #1a1b1e; border: 1px solid #3c4043; border-radius: 4px; padding: 0.35rem 0.65rem; cursor: pointer; }
+    #copy-log:hover { border-color: #8ab4f8; }
+    main { max-width: 52rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
     h2 { margin: 0 0 0.4rem; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: #9aa0a6; }
     section { margin: 0 0 1rem; padding: 0.75rem 0.9rem; background: #121316; border: 1px solid #3c4043; border-radius: 4px; }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
   </style>
 </head>
 <body>
-  <main>
+  <header class="log-top">
     <h1>Chat log · ${escapeHtml(session.document.fileName)}</h1>
+    <button type="button" id="copy-log">Copy</button>
+  </header>
+  <main>
     ${blocks}
   </main>
+  <script>
+    const logText = ${logJson};
+    const button = document.getElementById('copy-log');
+    button.addEventListener('click', () => {
+      const done = () => {
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+      };
+      const fallback = () => {
+        const area = document.createElement('textarea');
+        area.value = logText;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        area.remove();
+        done();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(logText).then(done, fallback);
+      } else {
+        fallback();
+      }
+    });
+  </script>
 </body>
 </html>`)
   page.document.close()

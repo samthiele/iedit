@@ -150,6 +150,24 @@ describe('review comments', () => {
     expect(table?.textContent).not.toContain('---')
     expect(host.querySelector('.del')?.textContent).toBe('such as')
   })
+
+  it('keeps the science note inside the collapsed summary', async () => {
+    root = createRoot(host)
+    const session = fixture('pending')
+    session.summary = 'Checked the age claim.'
+    session.scienceRan = true
+    session.sources = [{ title: 'Geology Page', uri: 'https://example.com/age' }]
+    await act(async () => {
+      root?.render(<ReviewPane session={session} onChange={() => undefined} />)
+    })
+    const details = host.querySelector('details.summary')
+    expect(details).toBeInstanceOf(HTMLDetailsElement)
+    expect((details as HTMLDetailsElement).open).toBe(false)
+    expect(details?.textContent).toContain('Science comments use a web search.')
+    expect(details?.textContent).toContain('Checked the age claim.')
+    expect(details?.textContent).toContain('Geology Page')
+    expect(host.querySelector('.review > .banner')).toBeNull()
+  })
 })
 
 function fixture(status: SuggestionStatus): ReviewSession {

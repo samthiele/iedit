@@ -1,5 +1,7 @@
+import copyEditRaw from './copy-edit.md?raw'
+import scienceReviewRaw from './science-review.md?raw'
+import scienceCommentRaw from './science-comment.md?raw'
 import geoscienceRaw from './disciplines/geoscience.md?raw'
-import writingRaw from './scientific-writing.md?raw'
 import { parseSkill } from './frontmatter.ts'
 
 export type DisciplineSkill = {
@@ -9,14 +11,20 @@ export type DisciplineSkill = {
   builtin: boolean
 }
 
-const geoscience = parseSkill(geoscienceRaw, 'Geoscience')
+export type ReviewStep = 'copyedit' | 'science-review' | 'science-comment'
 
-export const SCIENTIFIC_WRITING = writingRaw.trim()
+const STEP_SKILL: Record<ReviewStep, string> = {
+  copyedit: copyEditRaw.trim(),
+  'science-review': scienceReviewRaw.trim(),
+  'science-comment': scienceCommentRaw.trim(),
+}
+
+const geoscience = parseSkill(geoscienceRaw, 'Geoscience')
 
 export const BUILTIN_DISCIPLINES: DisciplineSkill[] = [
   { id: 'geoscience', builtin: true, title: geoscience.title, body: geoscience.body },
 ]
 
-export function systemInstruction(disciplineBody: string): string {
-  return `${SCIENTIFIC_WRITING}\n\n---\n\n# Active discipline\n\n${disciplineBody.trim()}`
+export function systemInstruction(disciplineBody: string, step: ReviewStep = 'copyedit'): string {
+  return `${STEP_SKILL[step]}\n\n---\n\n# Active discipline\n\n${disciplineBody.trim()}`
 }

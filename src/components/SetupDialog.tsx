@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { listOpenAiModels } from '../llm/client.ts'
+import { listOpenAiModels, testConnection } from '../llm/client.ts'
 import type { ModelCatalog } from '../llm/models.ts'
+import { WaitStatus } from './WaitStatus.tsx'
 import {
   clearSetupKey,
   getGenericBaseUrl,
@@ -16,10 +17,14 @@ import { DEFAULT_OPENAI_BASE_URL } from '../llm/storage.ts'
 
 export function SetupDialog({
   catalog,
+  parallelKey,
+  onParallelKey,
   onClose,
   onSaved,
 }: {
   catalog: ModelCatalog | null
+  parallelKey: string
+  onParallelKey: (value: string) => void
   onClose: () => void
   onSaved: () => void
 }) {
@@ -27,6 +32,8 @@ export function SetupDialog({
   const [drafts, setDrafts] = useState(() => initialDrafts(catalog))
   const [listed, setListed] = useState<string[]>([])
   const [message, setMessage] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [listing, setListing] = useState(false)
   const preset = presetById(tab)
   const draft = drafts[tab]
   const choices = modelChoices(preset, catalog, listed, draft.model)
@@ -45,6 +52,7 @@ export function SetupDialog({
 
   async function loadModels() {
     setMessage('')
+    setListing(true)
     const base = preset.baseUrl ?? draft.baseUrl
     try {
       const ids = await listOpenAiModels(base, draft.apiKey)
@@ -53,6 +61,26 @@ export function SetupDialog({
       setMessage(ids.length === 0 ? 'The server returned no model ids.' : `Loaded ${ids.length} models.`)
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setListing(false)
+    }
+  }
+
+  async function testKey() {
+    setMessage('')
+    setTesting(true)
+    try {
+      await testConnection({
+        provider: preset.provider,
+        apiKey: draft.apiKey,
+        baseUrl: preset.baseUrl ?? draft.baseUrl,
+        model: draft.model,
+      })
+      setMessage(`The key works. ${draft.model.trim()} is available.`)
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -137,11 +165,27 @@ export function SetupDialog({
             onChange={(event) => update({ apiKey: event.target.value })}
           />
         </label>
+        <label>
+          Parallel API key
+          <input
+            className="parallel-key"
+            type="password"
+            autoComplete="off"
+            value={parallelKey}
+            placeholder="Optional. Raises the free search limit."
+            onChange={(event) => onParallelKey(event.target.value)}
+          />
+        </label>
+        <p className="setup-note">
+          Optional. A key from <a href="https://platform.parallel.ai" target="_blank" rel="noreferrer">Parallel</a> raises the free search limit for the science pass.
+        </p>
         {preset.provider === 'openai' ? (
-          <button type="button" onClick={() => void loadModels()} disabled={!draft.apiKey.trim() || !(preset.baseUrl ?? draft.baseUrl).trim()}>
+          <button type="button" onClick={() => void loadModels()} disabled={listing || !draft.apiKey.trim() || !(preset.baseUrl ?? draft.baseUrl).trim()}>
             Load models
           </button>
         ) : null}
+        {listing ? <WaitStatus label="Asking what models are available" /> : null}
+        {testing ? <WaitStatus label="Checking this model" /> : null}
         {message ? <p className="setup-note">{message}</p> : null}
         <div className="modal-actions">
           <button type="button" onClick={() => {
@@ -149,6 +193,13 @@ export function SetupDialog({
             update({ apiKey: '' })
           }}>Remove key</button>
           <button type="button" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            onClick={() => void testKey()}
+            disabled={testing || !draft.apiKey.trim() || !draft.model.trim() || (preset.id === 'openai' && !draft.baseUrl.trim())}
+          >
+            Test
+          </button>
           <button
             type="button"
             className="run"

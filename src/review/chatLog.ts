@@ -15,17 +15,18 @@ export function parseChatLog(text: string): ChatLog {
     current?.lines.push(line)
   }
 
-  const system = blocks
-    .filter((block) => block.role === 'system')
-    .map((block) => block.lines.join('\n').trim())
-    .filter(Boolean)
-    .join('\n\n')
-  const turns = blocks
-    .filter((block) => block.role === 'user' || block.role === 'model')
-    .map((block) => ({
-      role: block.role as 'user' | 'model',
-      text: block.lines.join('\n').trim(),
-    }))
+  let system = ''
+  const turns: ChatLog['turns'] = []
+  for (const block of blocks) {
+    const text = block.lines.join('\n').trim()
+    if (block.role === 'system' && !system) {
+      system = text
+      continue
+    }
+    if (block.role === 'system' || block.role === 'user' || block.role === 'model') {
+      turns.push({ role: block.role, text })
+    }
+  }
   return { system, turns }
 }
 

@@ -4,7 +4,7 @@ title: Geoscience
 
 # Geoscience
 
-Apply this guidance on top of the scientific-writing skill. It covers geological wording and evidence. It does not change the output format.
+Apply this guidance on top of the active writing skill. It covers geological wording and evidence. It does not change the output format.
 
 ## Time and strata
 

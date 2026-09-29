@@ -8,6 +8,7 @@ const BLOCK = 'iedit.blockSize'
 const PROMPT = 'iedit.customPrompt'
 const DISCIPLINE = 'iedit.discipline'
 const CUSTOM = 'iedit.customSkills'
+const PARALLEL = 'iedit.parallelApiKey'
 
 export type LlmProvider = 'gemini' | 'openai'
 
@@ -84,6 +85,14 @@ export function getBlockSize(): string {
 
 export function setBlockSize(size: string): void {
   localStorage.setItem(BLOCK, size)
+}
+
+export function getParallelApiKey(): string {
+  return localStorage.getItem(PARALLEL) ?? ''
+}
+
+export function setParallelApiKey(apiKey: string): void {
+  localStorage.setItem(PARALLEL, apiKey.trim())
 }
 
 export function getCustomPrompt(): string {

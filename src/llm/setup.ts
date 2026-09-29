@@ -28,7 +28,6 @@ export type SetupPreset = {
   models: { id: string; label: string }[]
   keyUrl: string
   note: string
-  webSearch: boolean
   recipient: string
   privacyUrl: string | null
   privacyLabel: string
@@ -43,8 +42,7 @@ export const SETUP_PRESETS: SetupPreset[] = [
     defaultModel: 'gemini-3.1-flash-lite',
     models: [],
     keyUrl: 'https://aistudio.google.com/apikey',
-    note: 'Paste a Gemini API key. It stays in this browser. A science pass on this connection can search the web.',
-    webSearch: true,
+    note: 'Paste a Gemini API key. It stays in this browser.',
     recipient: 'Google',
     privacyUrl: 'https://ai.google.dev/gemini-api/terms',
     privacyLabel: 'Gemini API terms',
@@ -61,7 +59,6 @@ export const SETUP_PRESETS: SetupPreset[] = [
     ],
     keyUrl: 'https://platform.openai.com/api-keys',
     note: 'Paste an OpenAI API key. It stays in this browser.',
-    webSearch: false,
     recipient: 'OpenAI',
     privacyUrl: 'https://platform.openai.com/docs/guides/your-data',
     privacyLabel: 'OpenAI data controls',
@@ -79,7 +76,6 @@ export const SETUP_PRESETS: SetupPreset[] = [
     ],
     keyUrl: 'https://console.groq.com/keys',
     note: 'Paste a Groq API key. It stays in this browser.',
-    webSearch: false,
     recipient: 'Groq',
     privacyUrl: 'https://groq.com/privacy-policy',
     privacyLabel: 'Groq privacy policy',
@@ -95,7 +91,6 @@ export const SETUP_PRESETS: SetupPreset[] = [
     ],
     keyUrl: 'https://openrouter.ai/settings/keys',
     note: 'Paste an OpenRouter API key. It stays in this browser.',
-    webSearch: false,
     recipient: 'OpenRouter and the model provider it selects',
     privacyUrl: 'https://openrouter.ai/privacy',
     privacyLabel: 'OpenRouter privacy policy',
@@ -112,7 +107,6 @@ export const SETUP_PRESETS: SetupPreset[] = [
     ],
     keyUrl: 'https://cloud.cerebras.ai/',
     note: 'Paste a Cerebras API key. It stays in this browser.',
-    webSearch: false,
     recipient: 'Cerebras',
     privacyUrl: 'https://www.cerebras.ai/privacy-policy',
     privacyLabel: 'Cerebras privacy policy',
@@ -126,7 +120,6 @@ export const SETUP_PRESETS: SetupPreset[] = [
     models: [],
     keyUrl: 'https://console.mistral.ai/api-keys/',
     note: 'Paste a Mistral API key. It stays in this browser.',
-    webSearch: false,
     recipient: 'Mistral',
     privacyUrl: 'https://legal.mistral.ai/terms/privacy-policy',
     privacyLabel: 'Mistral privacy policy',
@@ -140,7 +133,6 @@ export const SETUP_PRESETS: SetupPreset[] = [
     models: [],
     keyUrl: '',
     note: 'Paste a server address and API key for any OpenAI-compatible API. They stay in this browser.',
-    webSearch: false,
     recipient: '',
     privacyUrl: null,
     privacyLabel: '',

@@ -36,11 +36,11 @@ jobs:
       - name: Publish the test review
         run: |
           mkdir -p dist/__fixtures dist/test
-          cp test/chatLog.txt dist/__fixtures/
+          cp test/wordChatLog.txt test/latexChatLog.txt test/testLatex.tex dist/__fixtures/
           if [[ -f test/testManuscript.docx ]]; then
             cp test/testManuscript.docx dist/__fixtures/
           else
-            echo "::warning title=Missing demo manuscript::test/testManuscript.docx is not in this checkout, so /test cannot load the manuscript."
+            echo "::warning title=Missing demo manuscript::test/testManuscript.docx is not in this checkout, so the Word demo cannot load the manuscript."
           fi
           cp dist/index.html dist/test/index.html
           cp dist/index.html dist/404.html

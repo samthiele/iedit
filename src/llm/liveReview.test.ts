@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { exportDocx } from '../export/docx.ts'
 import { parseDocx } from '../parse/docx.ts'
 import { isEditable, type LoadedDocument } from '../review/types.ts'
-import { systemInstruction, BUILTIN_DISCIPLINES } from '../skills/index.ts'
+import { BUILTIN_DISCIPLINES } from '../skills/index.ts'
 import { runReview } from './runReview.ts'
 
 const apiKey = process.env.GEMINI_API_KEY ?? ''
@@ -19,7 +19,7 @@ describe.skipIf(!apiKey)('live Gemini review', () => {
       provider: 'gemini',
       apiKey,
       model,
-      systemInstruction: systemInstruction(BUILTIN_DISCIPLINES[0].body),
+      disciplineBody: BUILTIN_DISCIPLINES[0].body,
       document: { ...loaded, paragraphs: slice },
       includeScience,
       chunkChars: 36000,

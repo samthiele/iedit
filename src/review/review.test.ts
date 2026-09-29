@@ -6,6 +6,7 @@ import { exportTex } from '../export/tex.ts'
 import { parseDocx } from '../parse/docx.ts'
 import { parseTex } from '../parse/tex.ts'
 import { bindEdits, extractEditFence, parseEditBody } from '../review/edits.ts'
+import { locateFormatted } from '../review/richText.ts'
 import { locateSpan } from '../review/span.ts'
 import { wordDiff } from '../review/diff.ts'
 import type { Suggestion } from '../review/types.ts'
@@ -63,14 +64,112 @@ describe('tex export', () => {
     })
     pending.status = 'pending'
     const marked = exportTex(loaded, [pending])
-    expect(marked).toContain('\\replaced[id=AI-copyedit]{Upper Cretaceous}{late cretaceous}')
-    expect(marked).toContain('\\pdfcomment')
-    expect(marked.indexOf('\\usepackage[markup=default]{changes}')).toBeLessThan(marked.indexOf('\\begin{document}'))
+    expect(marked).toContain('\\pdfmarkupcomment[markup=StrikeOut,author={AI-copyedit}]{late cretaceous}{Capitalise the formal time unit.}\nUpper Cretaceous')
+    expect(marked.indexOf('\\usepackage{pdfcomment}')).toBeLessThan(marked.indexOf('\\begin{document}'))
+    expect(marked).toContain('\\documentclass{article}')
 
     const applied = exportTex(loaded, [{ ...pending, status: 'accepted' }])
     expect(applied).toContain('The Upper Cretaceous sandstone is thick.')
-    expect(applied).not.toContain('\\replaced')
     expect(applied).not.toContain('\\pdfcomment')
+    expect(applied).not.toContain('\\usepackage{pdfcomment}')
+
+    const note = accepted({
+      paraId,
+      find: '',
+      insert: '',
+      comment: 'The age is not tied to a cited source.',
+      author: 'AI-science',
+    })
+    note.status = 'pending'
+    const commented = exportTex(loaded, [note])
+    expect(commented).toContain('\\pdfcomment[author={AI-science},icon=Comment]{The age is not tied to a cited source.}')
+    expect(commented).toContain('The late cretaceous sandstone is thick.')
+
+    const percent = { ...note, comment: 'About 50% of the variance.' }
+    const escaped = exportTex(loaded, [percent])
+    expect(escaped).toContain('\\pdfcomment[author={AI-science},icon=Comment]{About 50\\% of the variance.}')
+    expect(escaped).toContain('sandstone is thick.')
+
+    const prior = parseTex('paper.tex', source.replace('\\begin{document}', '\\usepackage{pdfcomment}\n\\begin{document}'))
+    const priorId = prior.paragraphs.find((item) => item.text.includes('cretaceous'))!.id
+    const kept = exportTex(prior, [{ ...pending, paraId: priorId }])
+    expect(kept.match(/\\usepackage\{pdfcomment\}/g)).toHaveLength(1)
+  })
+
+  it('shows prose and headings, and writes an accepted edit back inside the command', () => {
+    const source = [
+      '\\documentclass{article}',
+      '\\begin{document}',
+      '',
+      '\\begin{comment}',
+      '\\section*{Hidden}',
+      'secret highlight',
+      '\\end{comment}',
+      '',
+      '\\pagenumbering{arabic}',
+      '',
+      '\\title{Forest mapping}',
+      '',
+      '\\section{The \\textbf{offset}}',
+      '',
+      '\\textbf{The late} cretaceous sandstone is thick \\citep{heap2021}.',
+      '',
+      '\\end{document}',
+      '',
+    ].join('\n')
+    const loaded = parseTex('paper.tex', source)
+    const visible = loaded.paragraphs.filter((item) => item.kind !== 'preamble').map((item) => item.text)
+    expect(visible.join('\n')).not.toContain('secret')
+    expect(visible.join('\n')).not.toContain('Hidden')
+    expect(visible.join('\n')).not.toContain('arabic')
+    expect(visible.join('\n')).not.toContain('\\')
+    const title = loaded.paragraphs.find((item) => item.text === 'Forest mapping')
+    const heading = loaded.paragraphs.find((item) => item.text === 'The offset')
+    const sentence = loaded.paragraphs.find((item) => item.text.includes('cretaceous'))
+    expect(title?.kind).toBe('heading')
+    expect(title?.level).toBe(1)
+    expect(heading?.kind).toBe('heading')
+    expect(heading?.marks?.[0]).toMatchObject({ style: 'bold', start: 4, end: 10 })
+    expect(sentence?.text).toBe('The late cretaceous sandstone is thick.')
+    expect(sentence?.marks?.[0]).toMatchObject({ style: 'bold', start: 0, end: 8 })
+    const located = locateFormatted(sentence!, 'late')
+    expect(located?.actual).toBe('late')
+    const suggestion = accepted({
+      paraId: sentence!.id,
+      find: 'late',
+      insert: 'Upper',
+      comment: 'Capitalise the time word.',
+      author: 'AI-copyedit',
+    })
+    suggestion.span = { start: located!.start, end: located!.end }
+    const applied = exportTex(loaded, [{ ...suggestion, status: 'accepted' }])
+    expect(applied).toContain('\\textbf{The Upper} cretaceous sandstone is thick \\citep{heap2021}.')
+    const headingEdit = accepted({
+      paraId: heading!.id,
+      find: 'offset',
+      insert: 'shift',
+      comment: 'Use the plainer noun.',
+      author: 'AI-copyedit',
+    })
+    const headingAt = locateFormatted(heading!, 'offset')
+    headingEdit.span = { start: headingAt!.start, end: headingAt!.end }
+    const headed = exportTex(loaded, [{ ...headingEdit, status: 'accepted' }])
+    expect(headed).toContain('\\section{The \\textbf{shift}}')
+
+    const across = accepted({
+      paraId: sentence!.id,
+      find: 'thick.',
+      insert: 'massive.',
+      comment: 'Prefer the plainer adjective.',
+      author: 'AI-copyedit',
+    })
+    across.status = 'pending'
+    const acrossAt = locateFormatted(sentence!, 'thick.')
+    across.span = { start: acrossAt!.start, end: acrossAt!.end }
+    const noted = exportTex(loaded, [across])
+    expect(noted).toContain('thick \\citep{heap2021}.')
+    expect(noted).not.toContain('\\pdfmarkupcomment')
+    expect(noted).toContain('\\pdfcomment[author={AI-copyedit},icon=Comment]{Prefer the plainer adjective. Suggested: massive.}')
   })
 })
 

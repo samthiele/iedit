@@ -20,9 +20,9 @@ function testFixtures(): Plugin {
       res.end('Fixture not found')
       return
     }
-    res.setHeader('Content-Type', name.endsWith('.txt')
-      ? 'text/plain; charset=utf-8'
-      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    res.setHeader('Content-Type', name.endsWith('.docx')
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : 'text/plain; charset=utf-8')
     createReadStream(file).pipe(res)
   }
   return {
@@ -36,11 +36,11 @@ function testFixtures(): Plugin {
   }
 }
 
-function fixtureName(url: string | undefined): 'chatLog.txt' | 'testManuscript.docx' | null {
+const FIXTURES = ['wordChatLog.txt', 'latexChatLog.txt', 'testManuscript.docx', 'testLatex.tex'] as const
+
+function fixtureName(url: string | undefined): (typeof FIXTURES)[number] | null {
   const pathOnly = url?.split('?')[0] ?? ''
-  if (pathOnly.endsWith('/__fixtures/chatLog.txt')) return 'chatLog.txt'
-  if (pathOnly.endsWith('/__fixtures/testManuscript.docx')) return 'testManuscript.docx'
-  return null
+  return FIXTURES.find((name) => pathOnly.endsWith(`/__fixtures/${name}`)) ?? null
 }
 
 export default defineConfig(({ mode }) => ({

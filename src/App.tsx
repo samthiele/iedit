@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DemoLinks } from './components/DemoLinks.tsx'
 import { ReviewPane } from './components/ReviewPane.tsx'
+import { WaitStatus } from './components/WaitStatus.tsx'
 import { SkillDialog } from './components/SkillDialog.tsx'
 import { SetupDialog } from './components/SetupDialog.tsx'
 import { loadModelCatalog, resolveModel, type ModelCatalog } from './llm/models.ts'
@@ -10,16 +12,18 @@ import {
   getCustomSkills,
   getBlockSize,
   getCustomPrompt,
+  getParallelApiKey,
   getStoredDiscipline,
   saveCustomSkills,
   setBlockSize,
   setCustomPrompt,
+  setParallelApiKey,
   setStoredDiscipline,
   type StoredSkill,
 } from './llm/storage.ts'
 import { loadManuscript } from './parse/load.ts'
 import type { LoadedDocument, ReviewSession } from './review/types.ts'
-import { BUILTIN_DISCIPLINES, systemInstruction, type DisciplineSkill } from './skills/index.ts'
+import { BUILTIN_DISCIPLINES, type DisciplineSkill } from './skills/index.ts'
 import { parseSkill } from './skills/frontmatter.ts'
 
 export default function App() {
@@ -33,6 +37,7 @@ export default function App() {
   const [includeScience, setIncludeScience] = useState(true)
   const [blockSize, setBlockSizeState] = useState(getBlockSize)
   const [customPrompt, setCustomPromptState] = useState(getCustomPrompt)
+  const [parallelKey, setParallelKeyState] = useState(getParallelApiKey)
   const [session, setSession] = useState<ReviewSession | null>(null)
   const [progress, setProgress] = useState('')
   const [error, setError] = useState('')
@@ -58,10 +63,9 @@ export default function App() {
   const discipline = disciplines.find((item) => item.id === disciplineId) ?? BUILTIN_DISCIPLINES[0]
   const preset = presetById(connection.id)
   const usingGemini = connection.provider === 'gemini'
-  const webSearch = preset.webSearch
   const activeKey = connection.apiKey
   const activeModel = usingGemini && catalog ? resolveModel(catalog, connection.model) : connection.model
-  const scienceOn = webSearch && includeScience
+  const scienceOn = includeScience
   const notice = disclosure(preset, connection.baseUrl)
 
   async function onFile(file: File | undefined) {
@@ -92,11 +96,12 @@ export default function App() {
         apiKey: activeKey.trim(),
         baseUrl: connection.baseUrl,
         model: activeModel,
-        systemInstruction: systemInstruction(discipline.body),
+        disciplineBody: discipline.body,
         document: documentFile,
         includeScience: scienceOn,
         chunkChars: blockChars(blockSize),
         customPrompt,
+        parallelApiKey: parallelKey,
         disciplineTitle: discipline.title,
         onProgress: setProgress,
       })
@@ -155,7 +160,7 @@ export default function App() {
           <h1>
             Improving scientific writing
             {' '}
-            (<a href={`${import.meta.env.BASE_URL}test`}>Demo</a>)
+            <DemoLinks />
           </h1>
         </div>
         <div className="controls">
@@ -230,31 +235,38 @@ export default function App() {
             </select>
           </label>
           <p className="note">{blockNote(documentFile, blockSize, scienceOn)}</p>
-          {webSearch ? (
-            <>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={includeScience}
-                  onChange={(event) => setIncludeScience(event.target.checked)}
-                />
-                Include a science fact-checking pass
-              </label>
-              <p className="note">
-                Grounding checks citations and claims with Google Search. It is narrower than a full literature review: if search fails, the science pass stops and those notes are not presented as checked.
-              </p>
-            </>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={includeScience}
+              onChange={(event) => setIncludeScience(event.target.checked)}
+            />
+            Include a science fact-checking pass
+          </label>
+          {includeScience ? (
+            <p className="note">
+              Checks claims and reasoning with a web search. This can be helpful, though is narrower than a full literature search or human thought. Always think yourself, always verify yourself.
+            </p>
           ) : null}
           <div className="run-row">
             <button type="button" className="run" disabled={!documentFile || busy} onClick={() => void onRun()}>
-              {busy ? (progress || 'Reviewing…') : 'Review manuscript'}
+              Review manuscript
             </button>
+            {busy ? <WaitStatus label={progress || 'Working on copy-edits'} /> : null}
             <p className="disclaimer">
               Do not upload confidential information. The document content is sent to {notice.recipient}.
               {notice.privacyUrl ? (
                 <>
                   {' '}
                   <a href={notice.privacyUrl} target="_blank" rel="noreferrer">{notice.privacyLabel}</a>
+                </>
+              ) : null}
+              {scienceOn ? (
+                <>
+                  {' '}
+                  Science checks are also sent to Parallel, possibly including small sections/snippets of your text.
+                  {' '}
+                  <a href="https://parallel.ai/privacy-policy" target="_blank" rel="noreferrer">Parallel privacy policy</a>
                 </>
               ) : null}
             </p>
@@ -273,6 +285,11 @@ export default function App() {
       {setupOpen ? (
         <SetupDialog
           catalog={catalog}
+          parallelKey={parallelKey}
+          onParallelKey={(value) => {
+            setParallelKeyState(value)
+            setParallelApiKey(value)
+          }}
           onClose={() => setSetupOpen(false)}
           onSaved={() => setConnection(activeConnection())}
         />

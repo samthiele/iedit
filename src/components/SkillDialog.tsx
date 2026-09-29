@@ -3,6 +3,7 @@ import { generateReview, readableGeminiError } from '../llm/client.ts'
 import { activeConnection } from '../llm/setup.ts'
 import type { StoredSkill } from '../llm/storage.ts'
 import { skillFromReply, skillPrompt } from '../skills/generate.ts'
+import { WaitStatus } from './WaitStatus.tsx'
 
 export function SkillDialog({
   skills,
@@ -94,12 +95,13 @@ export function SkillDialog({
           />
         </label>
         {error ? <p className="error" role="alert">{error}</p> : null}
+        {busy ? <WaitStatus label="Writing the discipline skill" /> : null}
         {ready ? <p className="setup-note">Added “{ready.title}” to the discipline menu.</p> : null}
         <div className="modal-actions">
           <button type="button" onClick={onClose}>Close</button>
           {ready ? <button type="button" onClick={() => downloadSkill(ready.title, ready.file)}>Download skill</button> : null}
           <button type="button" className="run" onClick={() => void generate()} disabled={busy || !name.trim() || !description.trim()}>
-            {busy ? 'Generating…' : 'Generate skill'}
+            Generate skill
           </button>
         </div>
       </div>

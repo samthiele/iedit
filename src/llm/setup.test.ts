@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { SETUP_PRESETS, activeConnection, getSetupId, getSetupKey, saveSetup } from './setup.ts'
+import { activeConnection, getSetupId, getSetupKey, saveSetup } from './setup.ts'
 import { setOpenAiApiKey, setOpenAiBaseUrl, setOpenAiModel, setProvider } from './storage.ts'
 
 describe('setup', () => {
@@ -10,11 +10,6 @@ describe('setup', () => {
   it('keeps Gemini as the default', () => {
     expect(getSetupId()).toBe('gemini')
     expect(activeConnection().provider).toBe('gemini')
-  })
-
-  it('offers web search only on Gemini', () => {
-    const searching = SETUP_PRESETS.filter((preset) => preset.webSearch).map((preset) => preset.id)
-    expect(searching).toEqual(['gemini'])
   })
 
   it('moves an existing ChatGPT server onto the ChatGPT tab', () => {

@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parseDocx } from '../parse/docx.ts'
+import { parseTex } from '../parse/tex.ts'
 import { parseChatLog, sessionFromChatLog } from './chatLog.ts'
 import { appRoute } from '../route.ts'
 
-const logPath = 'test/chatLog.txt'
+const logPath = 'test/wordChatLog.txt'
 const manuscriptPath = 'test/testManuscript.docx'
 
 describe('saved chat log', () => {
@@ -35,5 +36,19 @@ describe('saved chat log', () => {
     expect(copy?.comment).toContain('Significantly')
     expect(science?.paraId).toBe('p-035')
     expect(science?.span).toBeNull()
+  })
+})
+
+describe('saved latex chat log', () => {
+  it('binds the saved reply onto the latex manuscript', () => {
+    const loaded = parseTex('testLatex.tex', readFileSync('test/testLatex.tex', 'utf8'))
+    const session = sessionFromChatLog(loaded, parseChatLog(readFileSync('test/latexChatLog.txt', 'utf8')))
+    const copy = session.suggestions.filter((suggestion) => suggestion.author === 'AI-copyedit')
+    const science = session.suggestions.find((suggestion) => suggestion.author === 'AI-science')
+    expect(session.warnings).toEqual([])
+    expect(copy.length).toBeGreaterThan(0)
+    expect(copy.every((suggestion) => suggestion.span)).toBe(true)
+    expect(science?.span).toBeNull()
+    expect(session.disciplineTitle).toBe('Geoscience')
   })
 })

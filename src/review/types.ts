@@ -14,6 +14,11 @@ export type TextLink = {
   href: string
 }
 
+export type TexCharMap = {
+  start: number
+  end: number
+}
+
 export type TableCellRef = {
   docxIndex: number
   text: string
@@ -34,6 +39,7 @@ export type Paragraph = {
   links?: TextLink[]
   texStart?: number
   texEnd?: number
+  texMap?: TexCharMap[]
 }
 
 export type Author = 'AI-copyedit' | 'AI-science'
@@ -73,7 +79,7 @@ export type LoadedDocument = {
 
 export type ChatLog = {
   system: string
-  turns: { role: 'user' | 'model'; text: string }[]
+  turns: { role: 'user' | 'model' | 'system'; text: string }[]
 }
 
 export type ReviewSession = {
