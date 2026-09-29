@@ -17,17 +17,36 @@ export function manuscriptSource(
     if (piece.kind === 'text') return htmlDecorated(piece.text, piece.start, marks, links)
     const hot = piece.suggestion.id === hoverId
     if (piece.kind === 'plain') {
-      return suggestionHtml(piece.suggestion.id, hot, 'suggest-mark', escapeHtml(piece.text))
+      const span = piece.suggestion.span
+      const inner = piece.suggestion.status === 'rejected' && span
+        ? htmlDecorated(piece.text, span.start, marks, links)
+        : markedSegments(piece.suggestion, marks, links, false)
+      return suggestionHtml(piece.suggestion.id, hot, 'suggest-mark', inner)
     }
-    const inner = piece.suggestion.segments.map((segment) => {
-      if (!segment.text) return ''
-      const escaped = escapeHtml(segment.text)
-      if (segment.type === 'delete') return `<span class="del">${escaped}</span>`
-      if (segment.type === 'insert') return `<span class="ins">${escaped}</span>`
-      return escaped
-    }).join('')
-    return suggestionHtml(piece.suggestion.id, hot, 'redline', inner)
+    return suggestionHtml(piece.suggestion.id, hot, 'redline', markedSegments(piece.suggestion, marks, links, true))
   }).join('')
+}
+
+function markedSegments(suggestion: Suggestion, marks: InlineMark[], links: TextLink[], pending: boolean): string {
+  const span = suggestion.span
+  if (!span || suggestion.segments.length === 0) return escapeHtml(suggestion.insert)
+  let offset = span.start
+  let html = ''
+  for (const segment of suggestion.segments) {
+    if (segment.type === 'insert') {
+      const text = escapeHtml(segment.text)
+      html += pending ? `<span class="ins">${text}</span>` : text
+      continue
+    }
+    const decorated = htmlDecorated(segment.text, offset, marks, links)
+    offset += segment.text.length
+    if (segment.type === 'delete') {
+      if (pending) html += `<span class="del">${decorated}</span>`
+    } else {
+      html += decorated
+    }
+  }
+  return html
 }
 
 function suggestionHtml(id: string, hot: boolean, className: string, inner: string): string {
@@ -41,6 +60,9 @@ function escapeHtml(value: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
+    .replaceAll('*', '&#42;')
+    .replaceAll('_', '&#95;')
+    .replaceAll('~', '&#126;')
 }
 
 function pieces(text: string, suggestions: Suggestion[]): Piece[] {

@@ -1,5 +1,5 @@
 import { createElement, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import Markdown, { type Components } from 'react-markdown'
+import Markdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import remarkGfm from 'remark-gfm'
 import { docxFileName, exportDocx } from '../export/docx.ts'
@@ -132,13 +132,10 @@ function ParagraphReview({
   return (
     <div className="para-row" ref={rowRef}>
       <div className={`para-line para-${paragraph.kind}${hoverWhole ? ' is-hovered' : ''}`}>
-        <Markdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw]}
-          components={markdownComponents(paragraph)}
-        >
-          {manuscriptSource(paragraph.text, notes, paragraph.marks, hoverId, paragraph.links)}
-        </Markdown>
+        <ParagraphText
+          paragraph={paragraph}
+          html={manuscriptSource(paragraph.text, notes, paragraph.marks, hoverId, paragraph.links)}
+        />
       </div>
       <div className="comment-rail">
         {notes.map((suggestion) => (
@@ -198,13 +195,19 @@ function CommentBubble({
 
 const COMMENT_GAP_REM = 1
 
-function markdownComponents(paragraph: Paragraph): Components | undefined {
-  if (paragraph.kind !== 'heading') return undefined
-  const level = Math.min(6, Math.max(1, paragraph.level ?? 2))
-  const tag = `h${level}` as 'h1'
-  return {
-    p: ({ children }) => createElement(tag, { className: 'md-heading' }, children),
+function ParagraphText({ paragraph, html }: { paragraph: Paragraph; html: string }) {
+  if (paragraph.kind === 'table') {
+    return (
+      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+        {html}
+      </Markdown>
+    )
   }
+  if (paragraph.kind === 'heading') {
+    const level = Math.min(6, Math.max(1, paragraph.level ?? 2))
+    return createElement(`h${level}`, { className: 'md-heading', dangerouslySetInnerHTML: { __html: html } })
+  }
+  return <p dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 export function stackCommentTops(desiredTops: number[], heights: number[], gap: number): number[] {

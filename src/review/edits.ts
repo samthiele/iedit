@@ -90,6 +90,7 @@ export function bindEdits(
   const byId = new Map(paragraphs.map((paragraph) => [paragraph.id, paragraph]))
   const suggestions: Suggestion[] = []
   const unmatched: string[] = []
+  const occupied = new Map<string, { start: number; end: number }[]>()
 
   edits.forEach((edit, index) => {
     const paragraph = byId.get(edit.paraId)
@@ -115,7 +116,7 @@ export function bindEdits(
       return
     }
 
-    const located = locateFormatted(paragraph, edit.find)
+    const located = locateFree(paragraph, edit.find, occupied)
     const insert = plainInsert(edit.insert)
     if (!located) {
       unmatched.push(`${edit.paraId}: “${trimQuote(edit.find)}” was not found verbatim`)
@@ -170,6 +171,29 @@ export function interpretModelReply(
       ? ['The iedit-edits fence did not contain any paragraph blocks.']
       : bound.unmatched
   return { suggestions: bound.suggestions, unmatched, summary: extracted.summary }
+}
+
+function locateFree(
+  paragraph: Paragraph,
+  needle: string,
+  occupied: Map<string, { start: number; end: number }[]>,
+): { start: number; end: number; actual: string } | null {
+  const ranges = occupied.get(paragraph.id) ?? []
+  let from = 0
+  while (from <= paragraph.text.length) {
+    const located = locateFormatted(paragraph, needle, from)
+    if (!located || located.start < from) return null
+    const overlaps = ranges.some((range) => located.start < range.end && located.end > range.start)
+    if (!overlaps) {
+      ranges.push({ start: located.start, end: located.end })
+      occupied.set(paragraph.id, ranges)
+      return located
+    }
+    const next = Math.max(located.end, from + 1)
+    if (next <= from) return null
+    from = next
+  }
+  return null
 }
 
 function trimQuote(value: string): string {

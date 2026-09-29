@@ -27,4 +27,25 @@ describe('manuscript markdown', () => {
     expect(source).toContain('<span class="del">such as</span>')
     expect(source).toContain('p &lt; 0.05.')
   })
+
+  it('keeps bold inside the redline and leaves underscores as text', () => {
+    const text = 'The offset is large_enough.'
+    const find = 'offset'
+    const start = text.indexOf(find)
+    const suggestion: Suggestion = {
+      id: 's1',
+      paraId: 'p-001',
+      find,
+      insert: 'shift',
+      comment: 'Use the plainer noun.',
+      author: 'AI-copyedit',
+      status: 'pending',
+      span: { start, end: start + find.length },
+      segments: wordDiff(find, 'shift'),
+      grounded: false,
+    }
+    const source = manuscriptSource(text, [suggestion], [{ start, end: start + find.length, style: 'bold' }])
+    expect(source).toContain('<span class="del"><strong>offset</strong></span>')
+    expect(source).toContain('large&#95;enough.')
+  })
 })

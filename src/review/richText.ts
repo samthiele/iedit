@@ -26,14 +26,21 @@ export function projectParagraph(paragraph: Paragraph): Projected {
 export function locateFormatted(
   paragraph: Paragraph,
   needle: string,
+  from = 0,
 ): { start: number; end: number; actual: string } | null {
   const projected = projectParagraph(paragraph)
-  const marked = locateSpan(projected.markdown, needle)
+  const marked = locateSpan(projected.markdown, needle, plainToMarkdown(projected.map, from))
   if (marked) {
     const plain = plainRange(projected.map, marked.start, marked.end, paragraph.text)
-    if (plain) return plain
+    if (plain && plain.start >= from) return plain
   }
-  return locateSpan(paragraph.text, needle)
+  return locateSpan(paragraph.text, needle, from)
+}
+
+function plainToMarkdown(map: number[], plainFrom: number): number {
+  if (plainFrom <= 0) return 0
+  const at = map.findIndex((plain) => plain >= plainFrom)
+  return at < 0 ? map.length : at
 }
 
 export function plainInsert(value: string): string {
@@ -201,4 +208,7 @@ function escapeHtml(value: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
+    .replaceAll('*', '&#42;')
+    .replaceAll('_', '&#95;')
+    .replaceAll('~', '&#126;')
 }

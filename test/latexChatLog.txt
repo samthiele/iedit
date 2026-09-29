@@ -850,9 +850,6 @@ I edited the dataset table, preprocessing, framework overview, task-branch parag
 ~~The network employs a 4-hierarchical structure.~~
 **<u>The network employs a four-level hierarchy.</u>**
 [COMMENT-COPYEDIT: "4-hierarchical structure" is not idiomatic; "four-level hierarchy" says the same thing.]
-~~**<u>Output dimensionality</u>**: The final backbone output provides a 96-dimensional point-wise feature representation used for downstream task heads.~~
-**<u>**<u>Output dimensionality</u>**: The final backbone output yields a 96-dimensional point-wise feature representation for the downstream task heads.</u>**
-[COMMENT-COPYEDIT: "yields" is more specific than "provides", and "for the downstream task heads" drops the empty "used for".]
 
 ### p-068
 ~~We assess the impact of self-supervised pretraining and domain adaptation on downstream performance in data-limited scenarios and compare it to a base scenario:~~
@@ -1135,9 +1132,6 @@ I edited the domain-adaptation, tree-classification, label-scenario, and instanc
 ~~In this scenario, we reduce the number of labeled points per tree by selecting only a subset of points throughout the scenes.~~
 **<u>In this scenario, we reduce the number of labeled points per tree by selecting only a subset of points across the scenes.</u>**
 [COMMENT-COPYEDIT: "throughout" implies full coverage; "across" matches sampling a subset.]
-~~This mimics a situation where a human operator selects sparse labels for each tree, reducing annotation time.~~
-**<u>This mimics an operator selecting sparse labels on each tree, which shortens annotation time.</u>**
-[COMMENT-COPYEDIT: "reducing annotation time" dangled from "tree"; "which shortens" links it to the whole practice, and "significantly" is removed as an undefined intensifier.] 
 ~~Our goal is to identify label quantities feasible for a rapid human annotator, while also examining how model performance behaves as label availability decreases.~~
 **<u>Our goal is to identify label quantities an annotator can produce quickly, and to examine how model performance changes as label availability decreases.</u>**
 [COMMENT-COPYEDIT: "feasible for a rapid human annotator" is wordy for labels produced quickly; "behaves" becomes "changes", the measurable verb.]
@@ -2929,6 +2923,11 @@ role: edit
 These strategies complement each other by addressing data scarcity at different levels. SSL provides a label-free geometric foundation for point-wise features, while domain adaptation compensates for the lack of instance-level grouping features in contrastive SSL, by aligning clustering logic across domains. This extraction of individual trees allows instance-level species classification in forest plot data, where hierarchical transfer learning leverages taxonomic structures to identify specific species from limited samples. This integrated flow ensures that the model moves from understanding raw geometric points to species identity.
 
 model
+```iedit-edits
+### p-015
+[COMMENT-SCIENCE: ]
+```
+
 ```iedit-search
 objective: Abstract claims pretrained models cut energy and carbon by 21%, but the numbers come from one dataset at matched accuracy; does that support a general reduction?
 query: pretrained model energy carbon reduction
@@ -3643,6 +3642,11 @@ role: edit
 Performance of instance segmentation under tree-level label reduction on the SCION dataset.
 
 model
+```iedit-edits
+### p-015
+[COMMENT-SCIENCE: ]
+```
+
 ```iedit-search
 objective: p-029 claims training from scratch "fails" at 0.01% labeled points; does failure generalize beyond this dataset?
 query: few-shot instance segmentation from-scratch failure point clouds
@@ -4290,6 +4294,11 @@ role: edit
 The authors acknowledge the open datasets used for pretraining and support from public research funding.
 
 model
+```iedit-edits
+### p-015
+[COMMENT-SCIENCE: ]
+```
+
 ```iedit-search
 objective: p-154 attributes lower intra-group species accuracy to the difficulty of distinguishing species within the same taxonomic group; is taxonomic closeness the cause?
 query: species classification accuracy congeneric vs different genus

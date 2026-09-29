@@ -54,7 +54,7 @@ export async function exportDocx(document: LoadedDocument, suggestions: Suggesti
   for (const [index, items] of byParagraph) {
     const element = paragraphs[index]
     if (!element) continue
-    const ordered = [...items].sort((a, b) => (b.span?.start ?? 0) - (a.span?.start ?? 0))
+    const ordered = dropOverlaps(items)
     for (const suggestion of ordered) {
       const note = applySuggestion(element, suggestion, revisionId)
       revisionId = note.nextId
@@ -121,6 +121,20 @@ function plainOffset(cell: TableCellRef, escapedOffset: number): number {
   return plainIndex
 }
 
+function dropOverlaps(items: Suggestion[]): Suggestion[] {
+  const sorted = [...items].sort((a, b) => (a.span?.start ?? 0) - (b.span?.start ?? 0))
+  const kept: Suggestion[] = []
+  let end = -1
+  for (const item of sorted) {
+    const start = item.span?.start ?? 0
+    const itemEnd = item.span?.end ?? start
+    if (item.span && start < end) continue
+    kept.push(item)
+    end = Math.max(end, itemEnd)
+  }
+  return kept.sort((a, b) => (b.span?.start ?? 0) - (a.span?.start ?? 0))
+}
+
 function applySuggestion(
   paragraph: Element,
   suggestion: Suggestion,
@@ -134,9 +148,15 @@ function applySuggestion(
   if (!suggestion.span || !suggestion.find) {
     if (suggestion.status === 'accepted') return { nextId, comment: null }
     const { text } = visiblePieces(paragraph)
-    const end = Math.min(text.length, Math.max(1, Math.min(text.length, 160)))
-    if (end > 0) {
-      wrapComment(paragraph, 0, end, commentId)
+    if (text.length === 0) {
+      const doc = paragraph.ownerDocument
+      if (doc) {
+        paragraph.appendChild(commentMarker(doc, 'commentRangeStart', commentId))
+        paragraph.appendChild(commentMarker(doc, 'commentRangeEnd', commentId))
+        paragraph.appendChild(commentReference(doc, commentId))
+      }
+    } else {
+      wrapComment(paragraph, 0, Math.min(text.length, 160), commentId)
     }
     return {
       nextId,
@@ -364,19 +384,21 @@ function wrapComment(paragraph: Element, start: number, end: number, commentId: 
   const inside = pieces.filter((piece) => piece.start >= start && piece.end <= end)
   if (inside.length === 0) return
   const doc = paragraph.ownerDocument
-  const parent = inside[0].run.parentNode
-  if (!doc || !parent) return
-  parent.insertBefore(commentMarker(doc, 'commentRangeStart', commentId), inside[0].run)
+  const first = inside[0].run
   const last = inside[inside.length - 1].run
+  const startParent = first.parentNode
+  const endParent = last.parentNode
+  if (!doc || !startParent || !endParent) return
+  startParent.insertBefore(commentMarker(doc, 'commentRangeStart', commentId), first)
   const after = last.nextSibling
   const endMarker = commentMarker(doc, 'commentRangeEnd', commentId)
   const reference = commentReference(doc, commentId)
-  if (after) {
-    parent.insertBefore(endMarker, after)
-    parent.insertBefore(reference, after)
+  if (after && after.parentNode === endParent) {
+    endParent.insertBefore(endMarker, after)
+    endParent.insertBefore(reference, after)
   } else {
-    parent.appendChild(endMarker)
-    parent.appendChild(reference)
+    endParent.appendChild(endMarker)
+    endParent.appendChild(reference)
   }
 }
 

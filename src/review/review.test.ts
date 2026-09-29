@@ -48,6 +48,26 @@ describe('edit fence', () => {
     expect(bound.suggestions[1].author).toBe('AI-science')
     expect(bound.unmatched).toEqual([])
   })
+
+  it('binds a repeated phrase to the next occurrence', () => {
+    const paragraphs = [{
+      id: 'p-001',
+      text: 'the cat and the dog',
+      kind: 'body' as const,
+      section: 'Introduction',
+      inTable: false,
+    }]
+    const edits = [
+      { paraId: 'p-001', find: 'the', insert: 'a', comment: 'First.', author: 'AI-copyedit' as const },
+      { paraId: 'p-001', find: 'the', insert: 'that', comment: 'Second.', author: 'AI-copyedit' as const },
+    ]
+    const bound = bindEdits(edits, paragraphs, { idPrefix: 'c', grounded: false })
+    expect(bound.unmatched).toEqual([])
+    expect(bound.suggestions.map((suggestion) => suggestion.span)).toEqual([
+      { start: 0, end: 3 },
+      { start: 12, end: 15 },
+    ])
+  })
 })
 
 describe('tex export', () => {
@@ -70,8 +90,14 @@ describe('tex export', () => {
 
     const applied = exportTex(loaded, [{ ...pending, status: 'accepted' }])
     expect(applied).toContain('The Upper Cretaceous sandstone is thick.')
+    expect(applied).not.toContain('late cretaceous')
     expect(applied).not.toContain('\\pdfcomment')
+    expect(applied).not.toContain('\\pdfmarkupcomment')
     expect(applied).not.toContain('\\usepackage{pdfcomment}')
+
+    const percentEdit = exportTex(loaded, [{ ...pending, status: 'accepted', insert: '50% of the unit' }])
+    expect(percentEdit).toContain('50\\% of the unit')
+    expect(percentEdit).not.toContain('\\pdfcomment')
 
     const note = accepted({
       paraId,
@@ -144,6 +170,27 @@ describe('tex export', () => {
     suggestion.span = { start: located!.start, end: located!.end }
     const applied = exportTex(loaded, [{ ...suggestion, status: 'accepted' }])
     expect(applied).toContain('\\textbf{The Upper} cretaceous sandstone is thick \\citep{heap2021}.')
+    expect(applied).not.toContain('\\pdfcomment')
+
+    const crossed = accepted({
+      paraId: sentence!.id,
+      find: 'late cretaceous',
+      insert: 'Upper Cretaceous',
+      comment: 'Capitalise the formal time unit.',
+      author: 'AI-copyedit',
+    })
+    const crossedAt = locateFormatted(sentence!, 'late cretaceous')
+    crossed.span = { start: crossedAt!.start, end: crossedAt!.end }
+    const crossedFile = exportTex(loaded, [crossed])
+    expect(crossedFile).toContain('\\textbf{The Upper Cretaceous} sandstone is thick \\citep{heap2021}.')
+    expect(crossedFile).not.toContain('\\pdfcomment')
+    expect(crossedFile).not.toContain('late')
+
+    const inside = { ...suggestion, status: 'pending' as const }
+    const pendingInside = exportTex(loaded, [inside])
+    expect(pendingInside).toContain('\\textbf{The  \\pdfcomment[author={AI-copyedit},icon=Comment]{Capitalise the time word. Suggested: Upper}late}')
+    expect(pendingInside).not.toContain('\\pdfmarkupcomment')
+    expect(pendingInside).toContain('\\pdfcomment[author={AI-copyedit},icon=Comment]{Capitalise the time word. Suggested: Upper}')
     const headingEdit = accepted({
       paraId: heading!.id,
       find: 'offset',
@@ -167,9 +214,8 @@ describe('tex export', () => {
     const acrossAt = locateFormatted(sentence!, 'thick.')
     across.span = { start: acrossAt!.start, end: acrossAt!.end }
     const noted = exportTex(loaded, [across])
-    expect(noted).toContain('thick \\citep{heap2021}.')
+    expect(noted).toContain('\\pdfcomment[author={AI-copyedit},icon=Comment]{Prefer the plainer adjective. Suggested: massive.}thick \\citep{heap2021}.')
     expect(noted).not.toContain('\\pdfmarkupcomment')
-    expect(noted).toContain('\\pdfcomment[author={AI-copyedit},icon=Comment]{Prefer the plainer adjective. Suggested: massive.}')
   })
 })
 
@@ -210,6 +256,31 @@ describe('docx export', () => {
     expect(appliedXml).not.toMatch(/<w:del[\s>]/)
     expect(appliedXml).not.toMatch(/<w:ins[\s>]/)
     expect(appliedZip.file('word/comments.xml')).toBeNull()
+  })
+
+  it('anchors a comment that starts inside a link and ends in the following run', async () => {
+    const buffer = await docxBody(`<w:p>
+      <w:hyperlink><w:r><w:t>See the paper</w:t></w:r></w:hyperlink>
+      <w:r><w:t> for the age of the sandstone.</w:t></w:r>
+    </w:p>`)
+    const loaded = await parseDocx('paper.docx', buffer)
+    const suggestion = accepted({
+      paraId: loaded.paragraphs[0].id,
+      find: '',
+      insert: '',
+      comment: 'Check the citation.',
+      author: 'AI-science',
+    })
+    suggestion.status = 'pending'
+    suggestion.span = null
+    suggestion.segments = []
+    const edited = await exportDocx(loaded, [suggestion])
+    const zip = await JSZip.loadAsync(edited)
+    const xml = await zip.file('word/document.xml')!.async('string')
+    const comments = await zip.file('word/comments.xml')!.async('string')
+    expect(xml).toContain('commentRangeStart')
+    expect(xml).toContain('See the paper')
+    expect(comments).toContain('Check the citation.')
   })
 
   it('reads a rectangular table as a pipe table and writes a cell edit back', async () => {
