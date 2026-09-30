@@ -17,6 +17,7 @@ Edit for a through-line, not a pile of locally shorter sentences.
 - Split a sentence only when the two parts are genuinely separate, and open the second with a link to the first.
 - Adjective fit: larger for size, higher for position, greater for quantity, longer for time or length.
 - Ignore journal-specific citation formatting.
+- Ignore floating line numbers and other formatting errors from converting PDF to Word.
 
 Section jobs:
 

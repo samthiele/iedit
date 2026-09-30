@@ -84,7 +84,11 @@ describe('tex export', () => {
     })
     pending.status = 'pending'
     const marked = exportTex(loaded, [pending])
-    expect(marked).toContain('\\pdfmarkupcomment[markup=StrikeOut,author={AI-copyedit}]{late cretaceous}{Capitalise the formal time unit.}\nUpper Cretaceous')
+    expect(marked).toContain('The \\pdfcomment[author={AI-copyedit},icon=Comment]{Capitalise the formal time unit.}{\\color{red}\\sout{late cretaceous}}{\\color{blue}Upper Cretaceous} sandstone is thick.')
+    expect(marked).not.toContain('Suggested:')
+    expect(marked).not.toContain('\\pdfmarkupcomment')
+    expect(marked.indexOf('\\usepackage{xcolor}')).toBeLessThan(marked.indexOf('\\begin{document}'))
+    expect(marked.indexOf('\\usepackage[normalem]{ulem}')).toBeLessThan(marked.indexOf('\\begin{document}'))
     expect(marked.indexOf('\\usepackage{pdfcomment}')).toBeLessThan(marked.indexOf('\\begin{document}'))
     expect(marked).toContain('\\documentclass{article}')
 
@@ -188,9 +192,9 @@ describe('tex export', () => {
 
     const inside = { ...suggestion, status: 'pending' as const }
     const pendingInside = exportTex(loaded, [inside])
-    expect(pendingInside).toContain('\\textbf{The  \\pdfcomment[author={AI-copyedit},icon=Comment]{Capitalise the time word. Suggested: Upper}late}')
+    expect(pendingInside).toContain('\\textbf{The \\pdfcomment[author={AI-copyedit},icon=Comment]{Capitalise the time word.}{\\color{red}\\sout{late}}{\\color{blue}Upper}}')
+    expect(pendingInside).not.toContain('Suggested:')
     expect(pendingInside).not.toContain('\\pdfmarkupcomment')
-    expect(pendingInside).toContain('\\pdfcomment[author={AI-copyedit},icon=Comment]{Capitalise the time word. Suggested: Upper}')
     const headingEdit = accepted({
       paraId: heading!.id,
       find: 'offset',
@@ -216,6 +220,88 @@ describe('tex export', () => {
     const noted = exportTex(loaded, [across])
     expect(noted).toContain('\\pdfcomment[author={AI-copyedit},icon=Comment]{Prefer the plainer adjective. Suggested: massive.}thick \\citep{heap2021}.')
     expect(noted).not.toContain('\\pdfmarkupcomment')
+  })
+
+  it('writes a percent note inside a list and a table', () => {
+    const source = [
+      '\\documentclass{article}',
+      '\\begin{document}',
+      '',
+      '\\begin{itemize}',
+      '\\item The late sandstone is thick.',
+      '\\end{itemize}',
+      '',
+      '\\begin{tabular}{ll}',
+      'sandstone & thick \\\\',
+      '\\end{tabular}',
+      '',
+      '\\end{document}',
+      '',
+    ].join('\n')
+    const loaded = parseTex('paper.tex', source)
+    const item = loaded.paragraphs.find((paragraph) => paragraph.text.includes('late sandstone'))
+    const cell = loaded.paragraphs.find((paragraph) => paragraph.text.includes('thick') && paragraph.kind === 'table')
+      ?? loaded.paragraphs.find((paragraph) => paragraph.text.includes('sandstone') && paragraph.text.includes('thick') && paragraph !== item)
+    expect(item).toBeTruthy()
+    expect(cell).toBeTruthy()
+    const itemEdit = accepted({
+      paraId: item!.id,
+      find: 'late',
+      insert: 'Upper',
+      comment: 'Capitalise the time word.',
+      author: 'AI-copyedit',
+    })
+    itemEdit.status = 'pending'
+    const itemAt = item!.text.indexOf('late')
+    itemEdit.span = { start: itemAt, end: itemAt + 'late'.length }
+    const listed = exportTex(loaded, [itemEdit])
+    expect(listed).toContain('\\item The {\\color{red}\\sout{late}}{\\color{blue}Upper} sandstone is thick.\n% iEdit (AI-copyedit): Capitalise the time word.')
+    expect(listed).not.toContain('Suggested:')
+    expect(listed).not.toContain('\\pdfcomment')
+    expect(listed).not.toContain('\\usepackage{pdfcomment}')
+    expect(listed).toContain('\\usepackage{xcolor}')
+    expect(listed).toContain('\\usepackage[normalem]{ulem}')
+
+    const cellEdit = accepted({
+      paraId: cell!.id,
+      find: 'thick',
+      insert: 'massive',
+      comment: 'Prefer the plainer adjective.',
+      author: 'AI-science',
+    })
+    cellEdit.status = 'pending'
+    const cellAt = cell!.text.indexOf('thick')
+    cellEdit.span = { start: cellAt, end: cellAt + 'thick'.length }
+    const tabled = exportTex(loaded, [cellEdit])
+    expect(tabled).toContain('sandstone & {\\color{red}\\sout{thick}}{\\color{blue}massive} \\\\\n% iEdit (AI-science): Prefer the plainer adjective.')
+    expect(tabled).not.toContain('Suggested:')
+    expect(tabled).not.toContain('\\pdfcomment')
+  })
+
+  it('loads a package that is only named inside a comment', () => {
+    const source = [
+      '\\documentclass{article}',
+      '% This uses \\usepackage{xcolor}, \\usepackage[normalem]{ulem}, and \\usepackage{pdfcomment}',
+      '\\begin{document}',
+      'The late cretaceous sandstone is thick.',
+      '\\end{document}',
+      '',
+    ].join('\n')
+    const loaded = parseTex('paper.tex', source)
+    const paraId = loaded.paragraphs.find((item) => item.text.includes('cretaceous'))!.id
+    const pending = accepted({
+      paraId,
+      find: 'late cretaceous',
+      insert: 'Upper Cretaceous',
+      comment: 'Capitalise the formal time unit.',
+      author: 'AI-copyedit',
+    })
+    pending.status = 'pending'
+    const marked = exportTex(loaded, [pending])
+    const code = marked.split('\n').filter((line) => !line.trimStart().startsWith('%'))
+    expect(code.some((line) => line.includes('\\usepackage{xcolor}'))).toBe(true)
+    expect(code.some((line) => line.includes('\\usepackage[normalem]{ulem}'))).toBe(true)
+    expect(code.some((line) => line.includes('\\usepackage{pdfcomment}'))).toBe(true)
   })
 })
 
